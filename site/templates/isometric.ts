@@ -15,7 +15,8 @@ import { postProcessing, FULLSCREEN_VERTEX } from '@tuomashatakka/threejs-scene/
 import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
 import { createStandardMaterial, treeProp, rockProp } from '@tuomashatakka/threejs-scene/modules/assets'
 
-import type { App, AppModule } from '@tuomashatakka/threejs-scene'
+import type { App, AppModule, SeededRng } from '@tuomashatakka/threejs-scene'
+import type { Prop } from '@tuomashatakka/threejs-scene/modules/assets'
 import type { Pass } from '@tuomashatakka/threejs-scene/modules/post/webgl/types'
 
 
@@ -103,8 +104,40 @@ function createTiltShiftPass (): Pass & { setSize (w: number, h: number): void }
   return pass
 }
 
+/**
+ * A scattered prop pinned to a world (noise) coordinate rather than to the
+ * screen, so it rides the land as the view scrolls past it.
+ */
+interface Dressing {
+  prop: Prop
+  wx:   number
+  wz:   number
+}
+
+const WATERLINE = HEIGHT * 0.24
+
+/** Find a land coordinate for a prop, or report that this column is underwater. */
+function placeOnLand (dressing: Dressing, rng: SeededRng, wz: number): void {
+  // a handful of tries beats an unbounded loop — the map is ~40% water, so six
+  // samples find land almost always, and the rare miss just hides for one lap
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const wx = rng.range(-GRID * 0.32, GRID * 0.32)
+    if (terrainHeight(wx, wz) >= WATERLINE) {
+      dressing.wx           = wx
+      dressing.wz           = wz
+      dressing.prop.visible = true
+      return
+    }
+  }
+  dressing.wz           = wz
+  dressing.prop.visible = false
+}
+
 /** The endless terrain: one InstancedMesh, re-sampled as the world slides by. */
 function terrainScape (): AppModule<ScapeState> {
+  const dressing: Dressing[] = []
+  let scatterRng: SeededRng | null = null
+
   return defineModule<ScapeState>({
     name: 'terrain-scape',
 
@@ -124,26 +157,19 @@ function terrainScape (): AppModule<ScapeState> {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
       ctx.scene.add(mesh)
 
-      // Scatter a few props so the scale reads. They ride the same scroll as
-      // the terrain by living under a group the module translates.
-      const dressing = new THREE.Group()
-      dressing.name  = 'dressing'
-
-      const rng    = ctx.rng.fork('dressing')
-      const spread = GRID * CELL * 0.32
+      // Scatter props so the scale reads. Each is pinned to a world coordinate
+      // and repositioned every frame, so it stays planted on its own patch of
+      // land as the view scrolls past — then recycles to the far edge on exit.
+      const rng = ctx.rng.fork('dressing')
       for (let i = 0; i < 22; i++) {
-        const x    = rng.range(-spread, spread)
-        const z    = rng.range(-spread, spread)
-        const land = terrainHeight(x / CELL, z / CELL)
-        // nothing grows below the waterline
-        if (land < HEIGHT * 0.24)
-          continue
-
-        const prop = i % 4 === 0 ? rockProp({ rng, scale: 0.8 }) : treeProp({ rng, scale: 0.85 })
-        prop.position.set(x, land, z)
-        dressing.add(prop)
+        const prop  = i % 4 === 0 ? rockProp({ rng, scale: 0.8 }) : treeProp({ rng, scale: 0.85 })
+        const entry = { prop, wx: 0, wz: 0 }
+        // spread the first batch across the whole visible depth
+        placeOnLand(entry, rng, rng.range(-GRID / 2, GRID / 2))
+        dressing.push(entry)
+        ctx.scene.add(prop)
       }
-      ctx.scene.add(dressing)
+      scatterRng = rng
 
       // Fog distance is measured from the CAMERA, and an ortho iso rig parks
       // ~100 units out — a range expressed in terrain-units would swallow the
@@ -164,6 +190,22 @@ function terrainScape (): AppModule<ScapeState> {
       // only rewrite the 4,096 instance matrices when we cross a cell boundary.
       mesh.position.z = -(offset - baseZ) * CELL
 
+      // Props live in world coordinates, so their screen slot is simply
+      // (world − offset). That keeps a tree welded to its hilltop instead of
+      // hovering in screen space while the land moves underneath it.
+      for (const entry of dressing) {
+        const slotZ = entry.wz - offset
+        if (slotZ < -GRID / 2 && scatterRng)
+          // exited past the near edge — recycle a full grid ahead
+          placeOnLand(entry, scatterRng, entry.wz + GRID)
+
+        entry.prop.position.set(
+          entry.wx * CELL,
+          terrainHeight(entry.wx, entry.wz),
+          (entry.wz - offset) * CELL,
+        )
+      }
+
       const previous = mesh.userData.baseZ as number | undefined
       if (previous === baseZ)
         return
@@ -175,15 +217,19 @@ function terrainScape (): AppModule<ScapeState> {
 
       for (let j = 0; j < GRID; j++)
         for (let i = 0; i < GRID; i++) {
+          // The grid SLOT is fixed; only the sample coordinate scrolls. Putting
+          // baseZ into the position instead would translate the whole slab away
+          // from a fixed camera — endless in principle, off-screen in seconds.
           const worldX = i - GRID / 2
-          const worldZ = baseZ + j - GRID / 2
+          const slotZ  = j - GRID / 2
+          const worldZ = baseZ + slotZ
           // flatten everything below the waterline into one flat sheet, so the
           // lowlands read as water rather than as very short columns
           const raw    = terrainHeight(worldX, worldZ)
           const height = Math.max(raw, HEIGHT * 0.18)
 
           matrix.makeScale(1, height, 1)
-          matrix.setPosition(worldX * CELL, height / 2, worldZ * CELL)
+          matrix.setPosition(worldX * CELL, height / 2, slotZ * CELL)
           mesh.setMatrixAt(index, matrix)
 
           const tier = Math.min(PALETTE.length - 1, Math.floor(raw / HEIGHT * PALETTE.length))
@@ -200,6 +246,15 @@ function terrainScape (): AppModule<ScapeState> {
       // the built-in resize only fixes perspective aspect — ortho needs its
       // frustum re-derived by hand
       resizeIsoCamera(ctx.camera as THREE.OrthographicCamera, size.width / size.height)
+    },
+
+    dispose () {
+      // each Prop owns what it built; free them explicitly rather than relying
+      // on the scene-wide sweep
+      for (const entry of dressing)
+        entry.prop.dispose()
+      dressing.length = 0
+      scatterRng      = null
     },
   })
 }
