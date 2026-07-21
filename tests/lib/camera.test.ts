@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 
-import { createIsoCamera, resizeIsoCamera, createFollowCamera } from 'Δ/index'
+import { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from 'Δ/index'
 
 
 describe('createIsoCamera', () => {
@@ -39,6 +39,40 @@ describe('createIsoCamera', () => {
 
     expect(camera.top).toBe(5)
     expect(camera.right).toBe(15)
+  })
+})
+
+describe('aimIsoCamera', () => {
+  it('swings the elevation while keeping the distance to the target', () => {
+    const camera = createIsoCamera(1)
+    const radius = camera.position.length()
+
+    aimIsoCamera(camera, { tilt: 15 })
+
+    expect(camera.position.length()).toBeCloseTo(radius)
+    expect(camera.position.y).toBeCloseTo(radius * Math.sin(THREE.MathUtils.degToRad(15)))
+  })
+
+  it('keeps the pose fields it was not given', () => {
+    const camera = createIsoCamera(1, { rotation: 20, target: [ 3, 0, -4 ]})
+
+    aimIsoCamera(camera, { tilt: 45 })
+
+    // yaw and target survive a tilt-only aim — this is what lets a zoom handler
+    // rack the elevation without knowing the rest of the rig's setup
+    expect(camera.userData.rotation).toBe(20)
+    expect(camera.userData.target).toEqual([ 3, 0, -4 ])
+    expect(Math.atan2(camera.position.z + 4, camera.position.x - 3))
+      .toBeCloseTo(THREE.MathUtils.degToRad(20))
+  })
+
+  it('leaves the frustum alone — zoom is resizeIsoCamera s job', () => {
+    const camera = createIsoCamera(2, { viewSize: 20 })
+
+    aimIsoCamera(camera, { tilt: 10 })
+
+    expect(camera.top).toBe(10)
+    expect(camera.right).toBe(20)
   })
 })
 

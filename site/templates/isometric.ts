@@ -1,27 +1,42 @@
 // Isometric tilt-shift endless scape
 // ----------------------------------
-// An orthographic iso rig over terrain that scrolls forever. The world is ONE
-// InstancedMesh of 4,096 columns (one draw call); it never grows, because the
-// grid stays put in instance space and only its heights are re-sampled as the
-// view slides forward. A tilt-shift pass blurs the top and bottom bands, which
-// is what sells the "tiny model railway" read.
+// An orthographic iso rig over terrain that scrolls forever, pannable and
+// zoomable. The world is ONE InstancedMesh of 4,096 columns (one draw call); it
+// never grows, because the grid stays put in instance space and only its
+// heights are re-sampled as the view slides. Panning is therefore not a camera
+// move at all — it shifts the sample origin, which is why the map is endless in
+// every direction rather than just forward.
+//
+// Zoom is the interesting control: one number drives the frustum, the camera's
+// elevation, the fog band, and the tilt-shift blur at once. Zoom in and the rig
+// tilts up toward the horizon while the bokeh thickens — the miniature reads as
+// a model you leaned in on. Zoom out and it lifts back into a map.
 
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
-import { createApp, defineModule, createIsoCamera, resizeIsoCamera } from '@tuomashatakka/threejs-scene'
+import { createApp, defineModule, createIsoCamera, resizeIsoCamera, aimIsoCamera, attachPointerGesture } from '@tuomashatakka/threejs-scene'
 import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
 import { postProcessing, FULLSCREEN_VERTEX } from '@tuomashatakka/threejs-scene/modules/post'
 import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
 import { createStandardMaterial, treeProp, rockProp } from '@tuomashatakka/threejs-scene/modules/assets'
 
-import type { App, AppModule, SeededRng } from '@tuomashatakka/threejs-scene'
+import type { App, AppModule } from '@tuomashatakka/threejs-scene'
 import type { Prop } from '@tuomashatakka/threejs-scene/modules/assets'
 import type { Pass } from '@tuomashatakka/threejs-scene/modules/post/webgl/types'
 
 
 interface ScapeState {
+
+  /** Auto-scroll rate along the track axis, in grid cells per second. */
   speed: number
+
+  /** View centre in grid coordinates — panning moves this, not the camera. */
+  panX: number
+  panZ: number
+
+  /** 1 = default framing, >1 closer. Drives frustum, tilt, fog AND bokeh. */
+  zoom: number
 }
 
 const GRID   = 64 // columns per side -> GRID² instances, still one draw call
@@ -29,6 +44,42 @@ const CELL   = 0.96 // world units per column
 const HEIGHT = 5.2 // tallest column
 // low → high: deep water, shallows, grass, rock, snow
 const PALETTE   = [ '#24405e', '#3f7fa6', '#5f9e6a', '#8a8f7d', '#e8ebe6' ]
+
+// The rig's yaw, in radians. Fixed, so the two ground-plane screen axes below
+// are constants rather than per-frame matrix reads.
+const YAW = Math.PI / 4
+// Screen-right and screen-up projected onto the ground, for an iso camera at
+// YAW looking at the origin. Derived from three's lookAt basis: x = ẑ × up.
+const RIGHT_X = Math.sin(YAW)
+const RIGHT_Z = -Math.cos(YAW)
+const UP_X    = Math.cos(YAW)
+const UP_Z    = Math.sin(YAW)
+
+const VIEW_SIZE = 20 // vertical world span at zoom 1
+const ZOOM_MIN  = 0.7 // any wider and the frame outruns the grid, showing the slab edge
+const ZOOM_MAX  = 3
+// Elevation in degrees at either end of the zoom range. Zoomed out is nearly
+// top-down and map-like; zoomed in tips up toward the horizon.
+const TILT_WIDE  = 34
+const TILT_CLOSE = 19
+// Tilt-shift strength/band at either end. Closer = a thicker blur over a
+// narrower sharp band, which is exactly how a real tilted lens behaves.
+const BLUR_WIDE  = 1.3
+const BLUR_CLOSE = 5.4
+const BAND_WIDE  = 0.3
+const BAND_CLOSE = 0.11
+
+const lerp      = (a: number, b: number, t: number): number => a + (b - a) * t
+const clampZoom = (zoom: number): number => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom))
+
+/**
+ * Where a zoom level sits in the range, 0 (widest) .. 1 (closest). Logarithmic
+ * because zoom is multiplicative — a wheel notch should feel the same at either
+ * end, and a linear fraction would spend most of its travel near ZOOM_MAX.
+ */
+function zoomFraction (zoom: number): number {
+  return (Math.log(clampZoom(zoom)) - Math.log(ZOOM_MIN)) / (Math.log(ZOOM_MAX) - Math.log(ZOOM_MIN))
+}
 
 // Seamless value noise. Hash-based so any world coordinate can be sampled
 // directly — no stored heightmap to scroll, wrap, or run out of.
@@ -64,17 +115,25 @@ function terrainHeight (x: number, z: number): number {
   return Math.pow(n, 1.35) * HEIGHT
 }
 
+/** A tilt-shift pass whose focus band can be racked from outside. */
+interface TiltShiftPass extends Pass {
+  setSize (width: number, height: number): void
+
+  /** `strength` in blur pixels at the frame edge; `band` is the sharp fraction of screen height. */
+  setBokeh (strength: number, band: number): void
+}
+
 // Tilt-shift: blur strength driven by distance from a horizontal focus band.
 // Screen-space (not depth) on purpose — an ortho camera has no perspective
 // falloff to key off, and the miniature illusion is a *screen* effect anyway.
-function createTiltShiftPass (): Pass & { setSize (w: number, h: number): void } {
+function createTiltShiftPass (): TiltShiftPass {
   const pass = new ShaderPass({
     uniforms: {
       tDiffuse:    { value: null },
       uResolution: { value: new THREE.Vector2(1, 1) },
       uFocus:      { value: 0.5 },
-      uBand:       { value: 0.18 },
-      uStrength:   { value: 2.6 },
+      uBand:       { value: BAND_WIDE },
+      uStrength:   { value: BLUR_WIDE },
     },
     vertexShader:   FULLSCREEN_VERTEX,
     fragmentShader: /* glsl */`
@@ -96,18 +155,76 @@ function createTiltShiftPass (): Pass & { setSize (w: number, h: number): void }
         gl_FragColor = sum / 1.172;
       }
     `,
-  }) as ShaderPass & { setSize (w: number, h: number): void }
+  }) as ShaderPass & TiltShiftPass
 
   pass.setSize = (width, height) => {
     (pass.uniforms.uResolution!.value as THREE.Vector2).set(width, height)
+  }
+  pass.setBokeh = (strength, band) => {
+    pass.uniforms.uStrength!.value = strength
+    pass.uniforms.uBand!.value     = band
   }
   return pass
 }
 
 /**
- * A scattered prop pinned to a world (noise) coordinate rather than to the
- * screen, so it rides the land as the view scrolls past it.
+ * Everything zoom drives, in one module: frustum, elevation, fog depth, and the
+ * tilt-shift band. Keeping them together is the point — split across three
+ * modules they would drift out of agreement the first time one was retuned.
  */
+function isoViewRig (tiltShift: TiltShiftPass): AppModule<ScapeState> {
+  let aspect  = 1
+  let applied = NaN
+
+  function apply (camera: THREE.OrthographicCamera, scene: THREE.Scene, zoom: number): void {
+    const t        = zoomFraction(zoom)
+    const viewSize = VIEW_SIZE / clampZoom(zoom)
+
+    camera.userData.viewSize = viewSize
+    resizeIsoCamera(camera, aspect)
+    aimIsoCamera(camera, { tilt: lerp(TILT_WIDE, TILT_CLOSE, t) })
+    tiltShift.setBokeh(lerp(BLUR_WIDE, BLUR_CLOSE, t), lerp(BAND_WIDE, BAND_CLOSE, t))
+
+    // Fog is measured from the CAMERA, which an ortho rig parks ~100 units out,
+    // so the band has to track the visible span or it reads as a flat grey wash
+    // the moment you zoom. These multipliers reproduce the zoom-1 look at every
+    // zoom level: haze just starting at the near edge, thick at the far one.
+    const fog = scene.fog as THREE.Fog | null
+    if (fog) {
+      const radius = camera.position.length()
+      fog.near     = radius - viewSize * 0.92
+      fog.far      = radius + viewSize * 1.53
+    }
+  }
+
+  return defineModule<ScapeState>({
+    name: 'iso-view-rig',
+
+    build (ctx) {
+      const size = ctx.renderer.getSize(new THREE.Vector2())
+      aspect        = size.x / size.y || 1
+      ctx.scene.fog = new THREE.Fog('#0a0a14', 1, 2) // range set by apply()
+      apply(ctx.camera as THREE.OrthographicCamera, ctx.scene, 1)
+    },
+
+    update (state, _frame, ctx) {
+      // zoom eases in the input layer, so this settles and then costs nothing
+      if (state.zoom === applied)
+        return
+      applied = state.zoom
+      apply(ctx.camera as THREE.OrthographicCamera, ctx.scene, state.zoom)
+    },
+
+    resize (size, ctx) {
+      // the built-in resize only fixes perspective aspect — ortho needs its
+      // frustum re-derived by hand
+      aspect = size.width / size.height
+      resizeIsoCamera(ctx.camera as THREE.OrthographicCamera, aspect)
+    },
+  })
+}
+
+/** A scattered prop pinned to a world (noise) coordinate, so it rides the land. */
 interface Dressing {
   prop: Prop
   wx:   number
@@ -116,27 +233,21 @@ interface Dressing {
 
 const WATERLINE = HEIGHT * 0.24
 
-/** Find a land coordinate for a prop, or report that this column is underwater. */
-function placeOnLand (dressing: Dressing, rng: SeededRng, wz: number): void {
-  // a handful of tries beats an unbounded loop — the map is ~40% water, so six
-  // samples find land almost always, and the rare miss just hides for one lap
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const wx = rng.range(-GRID * 0.32, GRID * 0.32)
-    if (terrainHeight(wx, wz) >= WATERLINE) {
-      dressing.wx           = wx
-      dressing.wz           = wz
-      dressing.prop.visible = true
-      return
-    }
-  }
-  dressing.wz           = wz
-  dressing.prop.visible = false
+/**
+ * Fold a prop's home coordinate into the GRID-wide box around the view centre.
+ * Props tile the plane instead of being recycled at one edge, so panning in any
+ * direction — including backwards — always has dressing to show, with no
+ * bookkeeping and nothing to run out of.
+ */
+function wrapAround (world: number, centre: number): number {
+  return world + GRID * Math.round((centre - world) / GRID)
 }
 
 /** The endless terrain: one InstancedMesh, re-sampled as the world slides by. */
 function terrainScape (): AppModule<ScapeState> {
   const dressing: Dressing[] = []
-  let scatterRng: SeededRng | null = null
+  let lastBaseX = NaN
+  let lastBaseZ = NaN
 
   return defineModule<ScapeState>({
     name: 'terrain-scape',
@@ -157,25 +268,16 @@ function terrainScape (): AppModule<ScapeState> {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
       ctx.scene.add(mesh)
 
-      // Scatter props so the scale reads. Each is pinned to a world coordinate
-      // and repositioned every frame, so it stays planted on its own patch of
-      // land as the view scrolls past — then recycles to the far edge on exit.
+      // Scatter props so the scale reads. Each keeps a fixed home coordinate and
+      // is wrapped into view every frame, so it stays planted on its own patch
+      // of land however far the view pans. Generous count: a wrapped prop that
+      // lands in water hides itself, and roughly a third of the map is water.
       const rng = ctx.rng.fork('dressing')
-      for (let i = 0; i < 22; i++) {
-        const prop  = i % 4 === 0 ? rockProp({ rng, scale: 0.8 }) : treeProp({ rng, scale: 0.85 })
-        const entry = { prop, wx: 0, wz: 0 }
-        // spread the first batch across the whole visible depth
-        placeOnLand(entry, rng, rng.range(-GRID / 2, GRID / 2))
-        dressing.push(entry)
+      for (let i = 0; i < 34; i++) {
+        const prop = i % 4 === 0 ? rockProp({ rng, scale: 0.8 }) : treeProp({ rng, scale: 0.85 })
+        dressing.push({ prop, wx: rng.range(-GRID / 2, GRID / 2), wz: rng.range(-GRID / 2, GRID / 2) })
         ctx.scene.add(prop)
       }
-      scatterRng = rng
-
-      // Fog distance is measured from the CAMERA, and an ortho iso rig parks
-      // ~100 units out — a range expressed in terrain-units would swallow the
-      // whole scene. Anchor it to the rig's actual distance instead.
-      const distance = ctx.camera.position.length()
-      ctx.scene.fog  = new THREE.Fog('#0a0a14', distance - GRID * CELL * 0.3, distance + GRID * CELL * 0.5)
     },
 
     update (state, frame, ctx) {
@@ -183,33 +285,33 @@ function terrainScape (): AppModule<ScapeState> {
       if (!mesh)
         return
 
-      const offset = frame.elapsed * state.speed * 3
-      const baseZ  = Math.floor(offset)
+      // The view centre in grid space: the endless forward scroll plus the pan.
+      const offsetX = state.panX
+      const offsetZ = frame.elapsed * state.speed * 3 + state.panZ
+      const baseX   = Math.floor(offsetX)
+      const baseZ   = Math.floor(offsetZ)
 
       // Slide the whole mesh by the sub-cell remainder every frame (free), and
       // only rewrite the 4,096 instance matrices when we cross a cell boundary.
-      mesh.position.z = -(offset - baseZ) * CELL
+      mesh.position.x = -(offsetX - baseX) * CELL
+      mesh.position.z = -(offsetZ - baseZ) * CELL
 
       // Props live in world coordinates, so their screen slot is simply
       // (world − offset). That keeps a tree welded to its hilltop instead of
       // hovering in screen space while the land moves underneath it.
       for (const entry of dressing) {
-        const slotZ = entry.wz - offset
-        if (slotZ < -GRID / 2 && scatterRng)
-          // exited past the near edge — recycle a full grid ahead
-          placeOnLand(entry, scatterRng, entry.wz + GRID)
+        const wx     = wrapAround(entry.wx, offsetX)
+        const wz     = wrapAround(entry.wz, offsetZ)
+        const height = terrainHeight(wx, wz)
 
-        entry.prop.position.set(
-          entry.wx * CELL,
-          terrainHeight(entry.wx, entry.wz),
-          (entry.wz - offset) * CELL,
-        )
+        entry.prop.visible = height >= WATERLINE
+        entry.prop.position.set((wx - offsetX) * CELL, height, (wz - offsetZ) * CELL)
       }
 
-      const previous = mesh.userData.baseZ as number | undefined
-      if (previous === baseZ)
+      if (lastBaseX === baseX && lastBaseZ === baseZ)
         return
-      mesh.userData.baseZ = baseZ
+      lastBaseX = baseX
+      lastBaseZ = baseZ
 
       const matrix = new THREE.Matrix4()
       const color  = new THREE.Color()
@@ -218,10 +320,12 @@ function terrainScape (): AppModule<ScapeState> {
       for (let j = 0; j < GRID; j++)
         for (let i = 0; i < GRID; i++) {
           // The grid SLOT is fixed; only the sample coordinate scrolls. Putting
-          // baseZ into the position instead would translate the whole slab away
-          // from a fixed camera — endless in principle, off-screen in seconds.
-          const worldX = i - GRID / 2
+          // the base offset into the position instead would translate the whole
+          // slab away from a fixed camera — endless in principle, off-screen in
+          // seconds.
+          const slotX  = i - GRID / 2
           const slotZ  = j - GRID / 2
+          const worldX = baseX + slotX
           const worldZ = baseZ + slotZ
           // flatten everything below the waterline into one flat sheet, so the
           // lowlands read as water rather than as very short columns
@@ -229,7 +333,7 @@ function terrainScape (): AppModule<ScapeState> {
           const height = Math.max(raw, HEIGHT * 0.18)
 
           matrix.makeScale(1, height, 1)
-          matrix.setPosition(worldX * CELL, height / 2, slotZ * CELL)
+          matrix.setPosition(slotX * CELL, height / 2, slotZ * CELL)
           mesh.setMatrixAt(index, matrix)
 
           const tier = Math.min(PALETTE.length - 1, Math.floor(raw / HEIGHT * PALETTE.length))
@@ -242,19 +346,14 @@ function terrainScape (): AppModule<ScapeState> {
         mesh.instanceColor.needsUpdate = true
     },
 
-    resize (size, ctx) {
-      // the built-in resize only fixes perspective aspect — ortho needs its
-      // frustum re-derived by hand
-      resizeIsoCamera(ctx.camera as THREE.OrthographicCamera, size.width / size.height)
-    },
-
     dispose () {
       // each Prop owns what it built; free them explicitly rather than relying
       // on the scene-wide sweep
       for (const entry of dressing)
         entry.prop.dispose()
       dressing.length = 0
-      scatterRng      = null
+      lastBaseX       = NaN
+      lastBaseZ       = NaN
     },
   })
 }
@@ -262,27 +361,81 @@ function terrainScape (): AppModule<ScapeState> {
 export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
   const aspect = canvas.clientWidth / canvas.clientHeight || 1
   // viewSize is deliberately smaller than the grid's world span (GRID × CELL),
-  // so terrain overfills the frame and the slab edge never shows
-  // A 30° tilt stretches the vertical screen axis across ~2× that distance in
-  // world space, so viewSize must stay well under the grid's span (GRID × CELL)
-  // for terrain to overfill the frame and hide the slab edge.
-  const camera = createIsoCamera(aspect, { viewSize: 20, flavor: 'dimetric' })
+  // so terrain overfills the frame and the slab edge never shows. A shallow
+  // tilt stretches the vertical screen axis across ~viewSize/sin(tilt) world
+  // units, which is what sets ZOOM_MIN.
+  const camera = createIsoCamera(aspect, { viewSize: VIEW_SIZE, flavor: 'dimetric' })
+  // built here rather than inside `effects` so the view rig can rack its focus
+  // band; postProcessing still owns it and disposes it
+  const tiltShift = createTiltShiftPass()
 
-  return createApp<ScapeState>(canvas, {
-    state: { speed: 1 },
+  const app = createApp<ScapeState>(canvas, {
+    state: { speed: 1, panX: 0, panZ: 0, zoom: 1 },
     seed:  11,
     camera,
     scene: { background: '#0a0a14' },
     use:   [
       standardLighting({ sun: { position: [ 12, 18, 8 ], intensity: 2.6 }}),
+      isoViewRig(tiltShift),
       terrainScape(),
       postProcessing<ScapeState>({
         bloom:   false,
-        effects: ctx => [ createBloom({ strength: 0.35, threshold: 0.7, width: ctx.width, height: ctx.height }), createTiltShiftPass() ],
+        effects: ctx => [ createBloom({ strength: 0.35, threshold: 0.7, width: ctx.width, height: ctx.height }), tiltShift ],
       }),
     ],
   })
+
+  // Drag pans, wheel/pinch zooms. Pan writes state directly (a drag should
+  // track the pointer exactly), zoom eases toward a target below.
+  let zoomTarget = 1
+
+  const detach = attachPointerGesture(canvas, {
+    onDrag (dx, dy) {
+      const { panX, panZ } = app.getState()
+      // grid cells per CSS pixel, so a drag covers the same ground at any zoom
+      const perPixel = (camera.userData.viewSize as number) / (canvas.clientHeight || 1) / CELL
+      const tilt     = THREE.MathUtils.degToRad(camera.userData.tilt as number)
+      // The ground is foreshortened by the tilt on the vertical screen axis
+      // only — one pixel up covers 1/sin(tilt) times as much ground as one
+      // pixel across. Without this the map slides diagonally under the pointer.
+      const across = -dx * perPixel
+      const along  = dy * perPixel / Math.sin(tilt)
+
+      app.setState({
+        panX: panX + across * RIGHT_X + along * UP_X,
+        panZ: panZ + across * RIGHT_Z + along * UP_Z,
+      })
+    },
+
+    onWheel (delta) {
+      // exponential so a notch is the same proportional step at any zoom
+      zoomTarget = clampZoom(zoomTarget * Math.exp(-delta * 0.0014))
+    },
+
+    onPinch (deltaScale) {
+      zoomTarget = clampZoom(zoomTarget * deltaScale)
+    },
+  })
+
+  const stopFrame = app.ctx.loop.onFrame(({ delta }) => {
+    const { zoom } = app.getState()
+    if (zoom === zoomTarget)
+      return
+
+    const eased = zoom + (zoomTarget - zoom) * (1 - Math.pow(2, -delta / 0.13))
+    // snap once inside a pixel of travel, so the rig stops re-deriving forever
+    app.setState({ zoom: Math.abs(zoomTarget - eased) < 1e-3 ? zoomTarget : eased })
+  })
+
+  const dispose = app.dispose
+  app.dispose   = () => {
+    stopFrame()
+    detach()
+    dispose()
+  }
+  return app
 }
 
 // perf: 1 draw call for the terrain (InstancedMesh) + one per dressing prop.
-// Instance matrices are rewritten only when the view crosses a cell boundary.
+// Instance matrices are rewritten only when the view crosses a cell boundary,
+// and the view rig re-derives the frustum only while the zoom is still moving.

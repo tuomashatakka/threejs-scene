@@ -12,6 +12,19 @@ export interface PointerGestureCallbacks {
   onPinch?: (deltaScale: number, centerX: number, centerY: number) => void
   onTap?:   (x: number, y: number, event: PointerEvent) => void
   onWheel?: (delta: number, event: WheelEvent) => void
+
+  /**
+   * Every pointer move over the element, pressed or not, in client
+   * coordinates — hover parallax, cursor-follow lights, tooltips. Fires
+   * alongside `onDrag` while a drag is in progress.
+   */
+  onHover?: (x: number, y: number, event: PointerEvent) => void
+
+  /**
+   * The pointer left the element. Pair with `onHover` to ease hover-driven
+   * state back to neutral instead of freezing it at the last position.
+   */
+  onLeave?: (event: PointerEvent) => void
 }
 
 /** Tap-detection tuning for {@link attachPointerGesture}. */
@@ -44,7 +57,8 @@ interface TrackedPointer {
  * two-pointer moves fire `onPinch` with the distance ratio to the previous
  * move (>1 zoom in) plus the pinch center; a press released within the tap
  * thresholds fires `onTap`; `onWheel` receives the raw `deltaY` and calls
- * `preventDefault()` on the event.
+ * `preventDefault()` on the event. `onHover` fires on every move regardless of
+ * button state, and `onLeave` when the pointer exits the element.
  *
  * @param el - Element to listen on, typically the render canvas. Its
  * `touch-action` style is set to `none` to disable native panning/zooming.
@@ -92,6 +106,9 @@ export function attachPointerGesture (
   }
 
   const onMove = (e: PointerEvent): void => {
+    // hover fires for untracked pointers too — that is the whole point of it
+    callbacks.onHover?.(e.clientX, e.clientY, e)
+
     const p = pointers.get(e.pointerId)
     if (!p)
       return
@@ -128,6 +145,10 @@ export function attachPointerGesture (
     }
   }
 
+  const onLeave = (e: PointerEvent): void => {
+    callbacks.onLeave?.(e)
+  }
+
   const onWheel = (e: WheelEvent): void => {
     if (callbacks.onWheel) {
       e.preventDefault()
@@ -139,6 +160,7 @@ export function attachPointerGesture (
   el.addEventListener('pointermove', onMove)
   el.addEventListener('pointerup', onUp)
   el.addEventListener('pointercancel', onUp)
+  el.addEventListener('pointerleave', onLeave)
   el.addEventListener('contextmenu', onSecondaryDown)
   el.addEventListener('wheel', onWheel, { passive: false })
 
@@ -147,6 +169,7 @@ export function attachPointerGesture (
     el.removeEventListener('pointermove', onMove)
     el.removeEventListener('pointerup', onUp)
     el.removeEventListener('pointercancel', onUp)
+    el.removeEventListener('pointerleave', onLeave)
     el.removeEventListener('contextmenu', onSecondaryDown)
     el.removeEventListener('wheel', onWheel)
   }

@@ -31,12 +31,67 @@ export interface IsoCameraOptions {
   target?: Vec3
 }
 
+/** Pose overrides for {@link aimIsoCamera}; anything omitted keeps its current value. */
+export interface IsoAimOptions {
+
+  /** Elevation above the ground plane in degrees — lower reads flatter, more first-person. */
+  tilt?: number
+
+  /** Yaw around y in degrees. */
+  rotation?: number
+
+  /** Point the rig looks at. */
+  target?: Vec3
+
+  /** Distance from the target. Cosmetic for an ortho projection; it only has to clear the clip planes. */
+  radius?: number
+}
+
+/**
+ * Re-aim an existing iso camera without rebuilding it — the runtime half of
+ * {@link createIsoCamera}. Every field is optional and falls back to the pose
+ * the camera already has (stored in `userData` by both functions), so
+ * `aimIsoCamera(camera, { tilt: 22 })` swings the elevation while keeping the
+ * yaw, target, and distance intact.
+ *
+ * @param camera - A camera from {@link createIsoCamera}.
+ * @param aim - Pose overrides in degrees / world units; see {@link IsoAimOptions}.
+ * @remarks Only moves the camera. Zoom is a frustum change — write
+ * `camera.userData.viewSize` and call {@link resizeIsoCamera}.
+ * @example
+ * // flatten the rig as the view zooms in
+ * aimIsoCamera(camera, { tilt: 34 - zoom * 6 })
+ */
+export function aimIsoCamera (camera: THREE.OrthographicCamera, aim: IsoAimOptions = {}): void {
+  const data    = camera.userData
+  const tiltDeg = aim.tilt ?? (data.tilt as number | undefined) ?? 30
+  const yawDeg  = aim.rotation ?? (data.rotation as number | undefined) ?? 45
+  const target  = aim.target ?? (data.target as Vec3 | undefined) ?? [ 0, 0, 0 ]
+  const radius  = aim.radius ?? (data.radius as number | undefined) ?? 100
+  const tilt    = THREE.MathUtils.degToRad(tiltDeg)
+  const yaw     = THREE.MathUtils.degToRad(yawDeg)
+  const horizon = radius * Math.cos(tilt)
+
+  camera.position.set(
+    target[0] + Math.cos(yaw) * horizon,
+    target[1] + Math.sin(tilt) * radius,
+    target[2] + Math.sin(yaw) * horizon,
+  )
+  camera.lookAt(target[0], target[1], target[2])
+
+  data.tilt     = tiltDeg
+  data.rotation = yawDeg
+  data.target   = target
+  data.radius   = radius
+}
+
 /**
  * Build an orthographic isometric camera.
  *
  * @param aspect - Viewport aspect ratio (width / height).
  * @returns An {@link THREE.OrthographicCamera} positioned on the iso axis. Its
- * `userData.viewSize` and `userData.target` are stored for {@link resizeIsoCamera}.
+ * `userData.viewSize` and `userData.target` are stored for {@link resizeIsoCamera},
+ * plus `tilt`/`rotation`/`radius` for {@link aimIsoCamera}.
  * @remarks Pass the result straight into `createApp({ camera })` — the app
  * accepts a prebuilt camera. Ortho cameras are NOT handled by the built-in
  * resize (it only fixes perspective aspect), so call {@link resizeIsoCamera}
@@ -59,20 +114,12 @@ export function createIsoCamera (aspect: number, {
   const camera     = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, near, far)
 
   const tilt = flavor === 'true-iso' ? Math.atan(1 / Math.SQRT2) : THREE.MathUtils.degToRad(30)
-  const yaw  = THREE.MathUtils.degToRad(rotation)
   // Distance is arbitrary for an ortho projection (no foreshortening) — it only
   // has to clear the far plane's near side, so park it well outside the scene.
   const radius = Math.min(far * 0.4, 100)
 
-  camera.position.set(
-    target[0] + Math.cos(yaw) * radius * Math.cos(tilt),
-    target[1] + Math.sin(tilt) * radius,
-    target[2] + Math.sin(yaw) * radius * Math.cos(tilt),
-  )
-  camera.lookAt(target[0], target[1], target[2])
-
   camera.userData.viewSize = viewSize
-  camera.userData.target   = target
+  aimIsoCamera(camera, { tilt: THREE.MathUtils.radToDeg(tilt), rotation, target, radius })
   return camera
 }
 

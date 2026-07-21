@@ -1,10 +1,15 @@
 // Realistic product display
 // -------------------------
-// A studio turntable: seamless backdrop, image-based lighting, physically
-// tuned materials, and drag-to-spin with inertia. The realism here is almost
-// entirely lighting and material discipline — an environment map for glass and
-// metal to reflect, one soft key shadow, and restrained post (a whisper of
-// bloom plus a gentle grade). No effect is doing the heavy lifting.
+// A studio turntable where the CAMERA is the turntable: it revolves slowly
+// around a product that never moves, so the key light rakes across the metal
+// and the glass dome picks up a travelling highlight — exactly what a physical
+// product shoot does, and what spinning the object instead cannot fake. The
+// pointer adds a small parallax tilt on top, and dragging nudges the revolve
+// with inertia.
+//
+// The realism is almost entirely lighting and material discipline — an
+// environment map for glass and metal to reflect, one soft key shadow, and
+// restrained post. No effect is doing the heavy lifting.
 
 import * as THREE from 'three'
 
@@ -20,12 +25,28 @@ import type { App, AppModule } from '@tuomashatakka/threejs-scene'
 
 interface ProductState {
 
-  /** Turntable angle in radians. */
-  spin: number
+  /** Camera azimuth around the product, in radians. */
+  orbit: number
 
-  /** Idle rotation rate in radians/second; drag overrides it momentarily. */
-  autoSpin: number
+  /** Idle revolve rate in radians/second; drag overrides it momentarily. */
+  orbitSpeed: number
+
+  /** Pointer parallax, -1..1 per axis, already smoothed by the input layer. */
+  tiltX: number
+  tiltY: number
 }
+
+const ORBIT_RADIUS = 5.4
+const ORBIT_HEIGHT = 2.3
+const ORBIT_START  = 0.68
+const LOOK_AT      = new THREE.Vector3(0, 1, 0)
+
+// How far the pointer may shift the rig. Deliberately tiny: parallax reads as
+// the object having presence, but push it and the framing starts wandering,
+// which is the one thing a product shot must not do.
+const TILT_YAW   = 0.09 // radians of extra azimuth at full deflection
+const TILT_RISE  = 0.55 // world units the camera climbs
+const TILT_PITCH = 0.14 // counter-move on the look-at, so it reads as a tilt not a crane
 
 /** The hero object — swap this factory to display something else. */
 function buildProduct (): Prop {
@@ -83,6 +104,7 @@ function studioSet (): AppModule<ProductState> {
     build (ctx) {
       // A large sphere seen from inside gives a seamless horizon with no visible
       // corner — the classic product-shot cyclorama, for the price of one mesh.
+      // It also means the revolving camera never finds a seam to reveal.
       const backdrop = new THREE.Mesh(
         new THREE.SphereGeometry(28, 48, 32),
         new THREE.MeshStandardMaterial({ color: '#20232b', roughness: 1, metalness: 0, side: THREE.BackSide }),
@@ -106,22 +128,16 @@ function studioSet (): AppModule<ProductState> {
   })
 }
 
-/** Turntable: idle rotation, drag to spin, inertia on release. */
-function turntable (): AppModule<ProductState> {
+/** The product itself. It never moves — the camera does. */
+function hero (): AppModule<ProductState> {
   let product: Prop | null = null
 
   return defineModule<ProductState>({
-    name: 'turntable',
+    name: 'hero',
 
     build (ctx) {
       product = buildProduct()
       ctx.scene.add(product)
-    },
-
-    update (state, frame) {
-      if (product)
-        product.rotation.y = state.spin
-      void frame
     },
 
     dispose () {
@@ -131,20 +147,54 @@ function turntable (): AppModule<ProductState> {
   })
 }
 
+/**
+ * The revolving camera rig. Pure projection of state onto the camera: given the
+ * same `orbit`/`tilt` it always produces the same pose, so nothing accumulates
+ * here and a dropped frame can never leave the framing skewed.
+ */
+function studioCamera (): AppModule<ProductState> {
+  return defineModule<ProductState>({
+    name: 'studio-camera',
+
+    build () {
+      // nothing to create — createApp already owns the camera
+    },
+
+    update (state, _frame, ctx) {
+      const angle = state.orbit + state.tiltX * TILT_YAW
+
+      ctx.camera.position.set(
+        Math.sin(angle) * ORBIT_RADIUS,
+        ORBIT_HEIGHT + state.tiltY * TILT_RISE,
+        Math.cos(angle) * ORBIT_RADIUS,
+      )
+      // Rising while aiming slightly lower (and vice versa) is what makes this
+      // read as a tilt rather than the camera simply drifting up and down.
+      ctx.camera.lookAt(LOOK_AT.x, LOOK_AT.y - state.tiltY * TILT_PITCH, LOOK_AT.z)
+    },
+  })
+}
+
 export function mount (canvas: HTMLCanvasElement): App<ProductState> {
   const app = createApp<ProductState>(canvas, {
-    state:  { spin: 0, autoSpin: 0.35 },
+    state:  { orbit: ORBIT_START, orbitSpeed: 0.22, tiltX: 0, tiltY: 0 },
     seed:   1,
-    camera: { position: [ 3.4, 2.3, 4.2 ], lookAt: [ 0, 1, 0 ], fov: 38 },
-    scene:  { background: '#20232b' },
-    use:    [
+    camera: {
+      // matches the rig's first pose, so frame zero is already on-model
+      position: [ Math.sin(ORBIT_START) * ORBIT_RADIUS, ORBIT_HEIGHT, Math.cos(ORBIT_START) * ORBIT_RADIUS ],
+      lookAt:   [ LOOK_AT.x, LOOK_AT.y, LOOK_AT.z ],
+      fov:      38,
+    },
+    scene: { background: '#20232b' },
+    use:   [
       standardLighting({
         env:  { intensity: 1.15 }, // IBL — glass and chrome need this to read
         sun:  { position: [ 5, 9, 4 ], intensity: 2.2, shadowMapSize: 2048, shadowFrustum: 8 },
         hemi: { skyColor: '#dce8ff', groundColor: '#2a2620', intensity: 0.5 },
       }),
       studioSet(),
-      turntable(),
+      hero(),
+      studioCamera(),
       postProcessing<ProductState>({
         bloom:   false,
         effects: ctx => [
@@ -155,27 +205,55 @@ export function mount (canvas: HTMLCanvasElement): App<ProductState> {
     ],
   })
 
-  // Drag to spin; velocity carries after release and decays back to idle.
+  // Drag nudges the revolve (velocity carries after release and decays back to
+  // idle); hovering leans the rig. Both are smoothed HERE rather than in the
+  // camera module — feel belongs to the input layer, so the module downstream
+  // stays a pure state → pose mapping.
   let velocity = 0
   let dragging = false
+  let hoverX   = 0
+  let hoverY   = 0
 
   const detach = attachPointerGesture(canvas, {
     onDrag (dx) {
       dragging = true
-      velocity = dx * 0.01
-      app.setState({ spin: app.getState().spin + velocity })
+      // negative: orbiting the camera one way turns the product the other, and
+      // a drag should push the product with the pointer
+      velocity = -dx * 0.006
+      app.setState({ orbit: app.getState().orbit + velocity })
+    },
+
+    onHover (x, y) {
+      const rect = canvas.getBoundingClientRect()
+      hoverX = Math.max(-1, Math.min(1, (x - rect.left) / rect.width * 2 - 1))
+      hoverY = Math.max(-1, Math.min(1, (y - rect.top) / rect.height * 2 - 1))
+    },
+
+    // freeze-on-exit looks like a bug; ease back to the neutral framing instead
+    onLeave () {
+      hoverX = 0
+      hoverY = 0
     },
   })
 
   const stopFrame = app.ctx.loop.onFrame(({ delta }) => {
-    const { spin, autoSpin } = app.getState()
+    const { orbit, orbitSpeed, tiltX, tiltY } = app.getState()
+    // slow half-life: parallax should trail the pointer, not snap to it
+    const ease = 1 - Math.pow(2, -delta / 0.24)
+    const lean = {
+      tiltX: tiltX + (hoverX - tiltX) * ease,
+      tiltY: tiltY + (hoverY - tiltY) * ease,
+    }
+
     if (dragging) {
       // one frame of grace, then hand control back to inertia
       dragging = false
+      app.setState(lean)
       return
     }
+
     velocity *= Math.pow(0.02, delta) // frame-rate independent decay
-    app.setState({ spin: spin + velocity + autoSpin * delta })
+    app.setState({ ...lean, orbit: orbit + velocity + orbitSpeed * delta })
   })
 
   const dispose = app.dispose

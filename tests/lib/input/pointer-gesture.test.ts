@@ -89,6 +89,38 @@ describe('attachPointerGesture', () => {
     expect(onTap).not.toHaveBeenCalled()
   })
 
+  it('fires onHover for moves with no pointer down', () => {
+    const onHover = vi.fn()
+    const onDrag  = vi.fn()
+    const { el }  = attach({ onHover, onDrag })
+
+    // no pointerdown first: hover must not depend on being tracked
+    el.emit('pointermove', pointer(1, 12, 30))
+
+    expect(onHover).toHaveBeenCalledWith(12, 30, expect.anything())
+    expect(onDrag).not.toHaveBeenCalled()
+  })
+
+  it('fires onHover alongside onDrag while dragging', () => {
+    const onHover = vi.fn()
+    const onDrag  = vi.fn()
+    const { el }  = attach({ onHover, onDrag })
+
+    el.emit('pointerdown', pointer(1, 0, 0))
+    el.emit('pointermove', pointer(1, 5, 5))
+
+    expect(onHover).toHaveBeenCalledWith(5, 5, expect.anything())
+    expect(onDrag).toHaveBeenCalledWith(5, 5, expect.anything())
+  })
+
+  it('fires onLeave when the pointer exits', () => {
+    const onLeave = vi.fn()
+    const { el }  = attach({ onLeave })
+
+    el.emit('pointerleave', pointer(1, 0, 0))
+    expect(onLeave).toHaveBeenCalledTimes(1)
+  })
+
   it('fires onWheel with deltaY and prevents default', () => {
     const onWheel = vi.fn()
     const { el }  = attach({ onWheel })
