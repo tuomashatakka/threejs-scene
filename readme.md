@@ -1,5 +1,7 @@
 # @tuomashatakka/threejs-scene
 
+![screenshot](screenshot.png)
+
 Lightweight imperative three.js app shell: `createApp` + a small module
 contract. Deterministic clock, seeded rng, unidirectional state flow, strict
 dispose chain. The successor core of `threejs-scenes` v3, rebuilt small.

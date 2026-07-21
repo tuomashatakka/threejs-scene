@@ -25,7 +25,7 @@ const sculpture = defineModule<State>({
 
     const knot = new THREE.Mesh(
       new THREE.IcosahedronGeometry(1),
-      new THREE.MeshStandardMaterial({ color: '#88aaff', metalness: 0.85, roughness: 0.25 }),
+      new THREE.MeshStandardMaterial({ color: '#141420', metalness: 0.85, roughness: 0.25 }),
     )
     knot.castShadow = true
     group.add(knot)
@@ -34,8 +34,8 @@ const sculpture = defineModule<State>({
     const rng = ctx.rng.fork('satellites')
     for (let i = 0; i < 24; i++) {
       const satellite = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(rng.range(0.05, 0.16), 1),
-        new THREE.MeshStandardMaterial({ color: '#ffd0a0', metalness: 0.4, roughness: 0.5 }),
+        new THREE.IcosahedronGeometry(rng.range(0.05, 0.16)),
+        new THREE.MeshStandardMaterial({ color: '#141420', metalness: 0.4, roughness: 0.5 }),
       )
       const angle  = i / 24 * Math.PI * 2
       const radius = rng.range(2.2, 3.1)
@@ -61,7 +61,7 @@ const ground = defineModule<State>({
   build (ctx) {
     const plane = new THREE.Mesh(
       new THREE.CircleGeometry(9, 48),
-      new THREE.MeshStandardMaterial({ color: '#141420', roughness: 0.9 }),
+      new THREE.MeshStandardMaterial({ color: '#141420', metalness: 0.9, roughness: 0.2 }),
     )
     plane.rotation.x    = -Math.PI / 2
     plane.position.y    = -2
