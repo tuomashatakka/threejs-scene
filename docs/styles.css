@@ -1,0 +1,258 @@
+/* ————————————————————————————————————————————————
+   styles.css — tokens + base + components, grouped with native CSS
+   nesting. Each component is one nested block whose selectors mirror
+   its semantic markup: `header.hero`, `a.btn.primary`, `dl.facts`.
+   Never `.btn-primary`. Never `.p-4`.
+   ———————————————————————————————————————————————— */
+
+:root {
+  color-scheme: light dark;
+
+  /* — color — */
+  --ink:       light-dark(#161616, #ededed);
+  --ink-soft:  light-dark(#3f3f3f, #c9c9c9);
+  --ink-faint: light-dark(#6b6b6b, #9a9a9a);
+  --line:      light-dark(#e6e6e6, #242424);
+  --wash:      light-dark(#f6f6f6, #161616);
+  --paper:     light-dark(#ffffff, #0e0e0e);
+  --accent:    light-dark(#2752e7, #7aa2ff);
+
+  /* — type — */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.175rem;
+  --text-xl: 1.35rem;
+  --text-2x: 2.35rem;
+
+  /* — rhythm — */
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1.5rem;
+  --space-lg: 3rem;
+  --space-xl: 5.5rem;
+
+  --measure:  38em;
+  --page-max: 47.5rem;
+  --snap:     200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* — base — */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin:      0;
+  background:  var(--paper);
+  color:       var(--ink);
+  font:        400 var(--text-md)/1.65 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width:     var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--space-md);
+}
+
+a {
+  color:           var(--accent);
+  text-decoration: none;
+
+  &:hover { text-decoration: underline; }
+}
+
+code, pre {
+  font-family: var(--font-mono);
+  font-size:   0.875em;
+}
+
+code {
+  background:    var(--wash);
+  padding:       0.1em 0.35em;
+  border-radius: 3px;
+}
+
+pre {
+  background:    var(--wash);
+  border:        1px solid var(--line);
+  border-radius: 6px;
+  padding:       1rem 1.125rem;
+  overflow-x:    auto;
+  line-height:   1.5;
+
+  & code { background: none; padding: 0; }
+}
+
+/* — hero — */
+
+header.hero {
+  padding:          var(--space-xl) 0 var(--space-lg);
+  border-block-end: 1px solid var(--line);
+
+  & .eyebrow {
+    font:             600 var(--text-xs)/1 var(--font-mono);
+    letter-spacing:   0.14em;
+    text-transform:   uppercase;
+    color:            var(--ink-faint);
+    margin-block-end: 1.25rem;
+  }
+
+  & h1 {
+    font-size:      var(--text-2x);
+    line-height:    1.12;
+    letter-spacing: -0.02em;
+    font-weight:    650;
+    margin:         0 0 1rem;
+  }
+
+  & .lede {
+    font-size: var(--text-lg);
+    color:     var(--ink-faint);
+    max-width: var(--measure);
+    margin:    0 0 1.75rem;
+  }
+
+  & .cta {
+    display:   flex;
+    flex-wrap: wrap;
+    gap:       0.625rem;
+  }
+}
+
+a.btn {
+  display:       inline-block;
+  padding:       0.5625rem 1rem;
+  border:        1px solid var(--line);
+  border-radius: 6px;
+  color:         var(--ink);
+  font-weight:   550;
+  font-size:     0.95rem;
+  transition:    border-color var(--snap), background var(--snap), opacity var(--snap);
+
+  &:hover {
+    border-color:    var(--ink);
+    text-decoration: none;
+  }
+
+  &.primary {
+    background:   var(--ink);
+    color:        var(--paper);
+    border-color: var(--ink);
+
+    &:hover { opacity: 0.88; }
+  }
+}
+
+/* — sections — */
+
+section {
+  padding:          var(--space-lg) 0;
+  border-block-end: 1px solid var(--line);
+
+  & h2 {
+    font-size:      var(--text-xl);
+    letter-spacing: -0.01em;
+    font-weight:    600;
+    margin:         0 0 1.125rem;
+  }
+
+  & h3 {
+    font-size:   var(--text-md);
+    font-weight: 600;
+    margin:      0 0 0.375rem;
+  }
+
+  & p { margin: 0 0 1rem; }
+
+  &:last-of-type { border-block-end: none; }
+}
+
+.muted { color: var(--ink-faint); }
+
+/* — feature grid — */
+
+[data-grid] {
+  display:               grid;
+  grid-template-columns: 1fr 1fr;
+  gap:                   1.75rem 2.25rem;
+  margin-block-start:    0.5rem;
+
+  & p {
+    margin:    0;
+    color:     var(--ink-faint);
+    font-size: 0.95rem;
+  }
+
+  @media (max-width: 37.5rem) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* — screenshot / diagram: grows on hover or focus — */
+
+img.diagram {
+  width:         100%;
+  height:        auto;
+  display:       block;
+  margin:        1.25rem 0 0.5rem;
+  border:        1px solid var(--line);
+  border-radius: 8px;
+  cursor:        zoom-in;
+  transition:    transform 350ms cubic-bezier(0.2, 0.7, 0.2, 1),
+                 box-shadow 350ms ease, border-color 350ms ease;
+
+  &:hover, &:focus-visible {
+    transform:    scale(1.08);
+    box-shadow:   0 0.75rem 2.75rem rgb(0 0 0 / 22%);
+    border-color: var(--accent);
+    position:     relative;
+    z-index:      2;
+  }
+
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+
+  @media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+/* — facts: term/value rows on a hairline rule — */
+
+dl.facts {
+  margin: 0;
+
+  & > div {
+    padding:               0.875rem 0;
+    border-block-start:    1px solid var(--line);
+    display:               grid;
+    grid-template-columns: 9rem 1fr;
+    gap:                   1.25rem;
+
+    &:first-child { border-block-start: none; }
+  }
+
+  & dt { font-weight: 600; }
+
+  & dd {
+    margin:    0;
+    color:     var(--ink-faint);
+    font-size: 0.95rem;
+  }
+
+  @media (max-width: 37.5rem) {
+    & > div { grid-template-columns: 1fr; gap: 0.25rem; }
+  }
+}
+
+footer {
+  padding:   var(--space-lg) 0 4.5rem;
+  color:     var(--ink-faint);
+  font-size: 0.9rem;
+
+  & a { color: var(--ink-faint); text-decoration: underline; }
+  & a:hover { color: var(--ink); }
+}

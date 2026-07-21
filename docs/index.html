@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>threejs-scene — a lightweight imperative three.js app shell</title>
+<meta name="description" content="createApp + a small module contract. Deterministic clock, seeded rng, unidirectional state flow, strict dispose chain. The successor core of threejs-scenes v3, rebuilt small.">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">threejs-scene</div>
+    <h1>A lightweight imperative three.js app shell, rebuilt small.</h1>
+    <p class="lede">
+      <code>createApp</code> + a small module contract. Deterministic clock,
+      seeded rng, unidirectional state flow, strict dispose chain. The
+      successor core of <code>threejs-scenes</code> v3.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/tuomashatakka/threejs-scene">View on GitHub</a>
+      <a class="btn" href="https://www.npmjs.com/package/@tuomashatakka/threejs-scene">npm</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>What it is</h2>
+    <p>
+      State flows down — <code>store &rarr; module.update &rarr; scene</code>,
+      once per simulation tick. Input flows back only through
+      <code>setState</code>/<code>dispatch</code>, never straight into scene
+      objects. Same seed + same tick sequence reproduce the exact same world,
+      headless included.
+    </p>
+    <img src="screenshot.png" class="diagram" tabindex="0" alt="threejs-scene demo scene rendered by the playground">
+  </section>
+
+  <section>
+    <h2>Core ideas</h2>
+    <div data-grid>
+      <div>
+        <h3>Deterministic clock</h3>
+        <p>A fixed-step clock decouples simulation ticks from frame rate, so the same seed and tick sequence always reproduce the same world — headless included.</p>
+      </div>
+      <div>
+        <h3>Seeded rng</h3>
+        <p>One seeded RNG threads through app state, so anything that reads randomness stays reproducible run to run.</p>
+      </div>
+      <div>
+        <h3>Unidirectional state flow</h3>
+        <p>State flows down through <code>module.update</code> once per tick; input flows back only through <code>setState</code>/<code>dispatch</code>.</p>
+      </div>
+      <div>
+        <h3>Strict dispose chain</h3>
+        <p>Every module tears down cleanly. <code>app.dispose()</code> walks the chain so nothing leaks between scenes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Layout</h2>
+    <dl class="facts">
+      <div><dt>lib/time</dt><dd>Clock, loop — the fixed/variable-step simulation clock and the shared frame loop.</dd></div>
+      <div><dt>lib/state</dt><dd>Store, rng — the state container and the seeded random source threaded through it.</dd></div>
+      <div><dt>lib/render</dt><dd>Renderer, resize — three.js renderer setup and viewport-resize handling.</dd></div>
+      <div><dt>lib/lifecycle</dt><dd>Dispose — the strict teardown chain every module and the app itself follow.</dd></div>
+      <div><dt>lib/input</dt><dd>Pointer-gesture — input capture that only ever reaches the scene through <code>dispatch</code>.</dd></div>
+      <div><dt>lib/app</dt><dd>Composition root — <code>createApp</code>, wiring clock, store, renderer and modules together.</dd></div>
+      <div><dt>modules/</dt><dd>Behavior modules (lighting, orbit) built entirely on the public surface.</dd></div>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Quickstart</h2>
+    <pre><code>import { createApp, defineModule } from '@tuomashatakka/threejs-scene'
+import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
+import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
+
+interface State { speed: number }
+
+const turbine = defineModule&lt;State&gt;({
+  name: 'turbine',
+  build (ctx)                { /* create objects once, add to ctx.scene */ },
+  update (state, frame, ctx) { /* project state onto them, every sim tick */ },
+})
+
+const app = createApp&lt;State&gt;(canvas, {
+  state: { speed: 1 },
+  seed:  7,
+  clock: { mode: 'fixed', step: 1 / 120 },
+  use:   [ standardLighting(), orbitControls() ],
+})
+
+app.use(turbine)          // runtime add; returned handle.remove() tears down
+app.start()               // or app.tick() for deterministic stepping
+app.setState({ speed: 2 })
+app.dispose()</code></pre>
+  </section>
+
+  <section>
+    <h2>Install</h2>
+    <p class="muted">Peer-depends on <code>three &gt;=0.160.0</code>.</p>
+    <pre><code>npm i @tuomashatakka/threejs-scene three</code></pre>
+  </section>
+
+  <footer>
+    <p>
+      <a href="https://github.com/tuomashatakka/threejs-scene">github.com/tuomashatakka/threejs-scene</a>
+      &middot; ISC licensed
+    </p>
+  </footer>
+
+</main>
+</body>
+</html>
