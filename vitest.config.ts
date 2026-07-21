@@ -2,9 +2,15 @@ import { defineConfig } from 'vitest/config'
 
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      'Δ': './lib',
+      'ꭍ': './modules',
+    },
+  },
   test: {
     environment:     'node',
-    include:         [ 'lib/**/*.test.ts', 'modules/**/*.test.ts' ],
+    include:         [ 'tests/**/*.test.ts' ],
     passWithNoTests: true,
   },
 })

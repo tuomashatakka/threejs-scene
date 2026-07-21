@@ -6,9 +6,9 @@
 
 import * as THREE from 'three'
 
-import { createApp, defineModule } from '../lib/index.js'
-import { standardLighting } from '../modules/lighting.js'
-import { orbitControls } from '../modules/orbit.js'
+import { createApp, defineModule } from 'Δ/index'
+import { standardLighting } from 'ꭍ/lighting'
+import { orbitControls } from 'ꭍ/orbit'
 
 
 interface State {
@@ -24,7 +24,7 @@ const sculpture = defineModule<State>({
     group.name  = 'sculpture'
 
     const knot = new THREE.Mesh(
-      new THREE.TorusKnotGeometry(1, 0.32, 220, 32),
+      new THREE.IcosahedronGeometry(1),
       new THREE.MeshStandardMaterial({ color: '#88aaff', metalness: 0.85, roughness: 0.25 }),
     )
     knot.castShadow = true

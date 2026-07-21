@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { attachResizeObserver } from './resize.js'
+import { attachResizeObserver } from 'Δ/render/resize'
 
 
 class FakeResizeObserver {

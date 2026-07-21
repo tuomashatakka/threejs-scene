@@ -5,9 +5,9 @@
 // proving the module contract is sufficient for built-ins.
 
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment'
 
-import type { AppModule, SceneContext, Vec3 } from '../lib/index.js'
+import type { AppModule, SceneContext, Vec3 } from '../lib/index'
 
 
 /** Environment (IBL) tuning for {@link standardLighting}. */

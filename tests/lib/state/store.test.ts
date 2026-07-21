@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createStore } from './store.js'
+import { createStore } from 'Δ/state/store'
 
 
 interface CounterState {

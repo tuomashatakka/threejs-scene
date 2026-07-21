@@ -67,6 +67,10 @@ export function attachPointerGesture (
   // critical: disable native gesture handling on the canvas
   el.style.touchAction = 'none'
 
+  const onSecondaryDown = (e: PointerEvent): void => {
+    e.preventDefault()
+  }
+
   const onDown = (e: PointerEvent): void => {
     el.setPointerCapture(e.pointerId)
     pointers.set(e.pointerId, {
@@ -135,6 +139,7 @@ export function attachPointerGesture (
   el.addEventListener('pointermove', onMove)
   el.addEventListener('pointerup', onUp)
   el.addEventListener('pointercancel', onUp)
+  el.addEventListener('contextmenu', onSecondaryDown)
   el.addEventListener('wheel', onWheel, { passive: false })
 
   return () => {

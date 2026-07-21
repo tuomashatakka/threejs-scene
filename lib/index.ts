@@ -5,34 +5,34 @@
 // modules live in the root modules/ directory and are imported via subpaths:
 //   import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
 
-export * from './types.js'
+export * from './types'
 
 // app — the composition root
-export { createApp } from './app/create-app.js'
-export { defineModule } from './app/module.js'
-export type { App, AppOptions, AppCameraOptions, AppSceneOptions, AppLoopOptions } from './app/create-app.js'
-export type { AppModule, ModuleHandle } from './app/module.js'
+export { createApp } from './app/create-app'
+export { defineModule } from './app/module'
+export type { App, AppOptions, AppCameraOptions, AppSceneOptions, AppLoopOptions } from './app/create-app'
+export type { AppModule, ModuleHandle } from './app/module'
 
 // time — when things happen
-export { createClock } from './time/clock.js'
-export { createFrameLoop } from './time/loop.js'
-export type { Clock, ClockMode, ClockOptions } from './time/clock.js'
-export type { FrameLoopOptions } from './time/loop.js'
+export { createClock } from './time/clock'
+export { createFrameLoop } from './time/loop'
+export type { Clock, ClockMode, ClockOptions } from './time/clock'
+export type { FrameLoopOptions } from './time/loop'
 
 // state — what the world is
-export { createStore } from './state/store.js'
-export { createSeededRng, mulberry32 } from './state/rng.js'
-export type { Store, Reducer, StoreListener } from './state/store.js'
+export { createStore } from './state/store'
+export { createSeededRng, mulberry32 } from './state/rng'
+export type { Store, Reducer, StoreListener } from './state/store'
 
 // render — how it reaches the screen
-export { createRenderer } from './render/renderer.js'
-export { attachResizeObserver } from './render/resize.js'
-export type { RendererOptions } from './render/renderer.js'
-export type { ResizeHandler } from './render/resize.js'
+export { createRenderer } from './render/renderer'
+export { attachResizeObserver } from './render/resize'
+export type { RendererOptions } from './render/renderer'
+export type { ResizeHandler } from './render/resize'
 
 // lifecycle — teardown
-export { disposeScene, disposeMaterial } from './lifecycle/dispose.js'
+export { disposeScene, disposeMaterial } from './lifecycle/dispose'
 
 // input — how intent enters the system
-export { attachPointerGesture } from './input/pointer-gesture.js'
-export type { PointerGestureCallbacks, PointerGestureOptions } from './input/pointer-gesture.js'
+export { attachPointerGesture } from './input/pointer-gesture'
+export type { PointerGestureCallbacks, PointerGestureOptions } from './input/pointer-gesture'

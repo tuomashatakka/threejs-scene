@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { attachPointerGesture } from './pointer-gesture.js'
+import { attachPointerGesture } from 'Δ/input/pointer-gesture'
 
 
 type Listener = (event: unknown) => void

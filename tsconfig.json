@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -10,7 +10,14 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": []
+    "types": [],
+    "rootDir": ".",
+    "allowJs": true,
+    "paths": {
+      "Δ/*": ["./lib/*"],
+      "ꭍ/*": ["./modules/*"]
+    }
   },
-  "include": ["lib", "modules", "playground", "*.config.ts"]
+  "include": ["lib", "modules", "playground", "tests", "*.config.ts"],
+  "exclude": ["playground/vite.config.ts"]
 }

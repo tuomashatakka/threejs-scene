@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { disposeMaterial, disposeScene } from './dispose.js'
+import { disposeMaterial, disposeScene } from 'Δ/lifecycle/dispose'
 
 
 function makeTexture (): THREE.DataTexture {

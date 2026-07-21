@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createClock } from './clock.js'
+import { createClock } from 'Δ/time/clock'
 
 
 describe('createClock', () => {

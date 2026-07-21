@@ -3,7 +3,7 @@
 // fork(label) API is the determinism lesson: seed once, fork a sub-stream per
 // consumer, so build order and undo/redo replay never change the output.
 
-import type { SeededRng } from '../types.js'
+import type { SeededRng } from '../types'
 
 
 /** Tiny fast seeded PRNG: returns a `() => number` yielding uniform values in [0, 1). Same seed → same stream. */

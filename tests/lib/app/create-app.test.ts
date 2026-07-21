@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createApp } from './create-app.js'
-import { defineModule } from './module.js'
+import { createApp } from 'Δ/app/create-app'
+import { defineModule } from 'Δ/app/module'
 
-import type { FrameContext, SceneContext } from '../types.js'
+import type { FrameContext, SceneContext } from 'Δ/types'
 
 
 interface State {

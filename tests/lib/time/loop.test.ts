@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { frameLoopManager } from '@tuomashatakka/canvas-loop-framecapper'
 
-import { createFrameLoop } from './loop.js'
+import { createFrameLoop } from 'Δ/time/loop'
 
-import type { FrameLoop } from '../types.js'
+import type { FrameLoop } from 'Δ/types'
 
 
 let rafCallbacks: FrameRequestCallback[] = []

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createSeededRng, mulberry32 } from './rng.js'
+import { createSeededRng, mulberry32 } from 'Δ/state/rng'
 
 
 describe('mulberry32', () => {

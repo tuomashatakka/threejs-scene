@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createApp } from '../lib/index.js'
-import { orbitControls } from './orbit.js'
+import { createApp } from 'Δ/index'
+import { orbitControls } from 'ꭍ/orbit'
 
 
 type Listener = (event: unknown) => void

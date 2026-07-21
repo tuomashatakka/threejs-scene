@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createApp } from '../lib/index.js'
-import { standardLighting } from './lighting.js'
+import { createApp } from 'Δ/index'
+import { standardLighting } from 'ꭍ/lighting'
 
 
 function fakeRenderer (): THREE.WebGLRenderer {
