@@ -166,6 +166,15 @@ label[data-range] {
   font-size:   0.75em;
 }
 
+/* — scene speed: an app-state control, above the effect list — */
+
+aside[data-controls] > label[data-speed] {
+  padding-inline:   var(--space-md);
+  margin-block:     0 var(--space-sm);
+  padding-block-end: var(--space-sm);
+  border-block-end: 1px solid var(--line);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .back, button[data-reset] { transition: none; }
 }

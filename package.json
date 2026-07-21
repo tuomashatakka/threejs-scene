@@ -22,10 +22,11 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:site": "vite build site",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "dev": "vite playground"
+    "dev": "npm run build && vite site"
   },
   "repository": {
     "type": "git",

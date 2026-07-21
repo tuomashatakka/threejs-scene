@@ -85,7 +85,10 @@ Every effect's parameters are adjustable live in the
 `lib/` is grouped by function — `time/` (clock, loop), `state/` (store, rng),
 `render/` (renderer, resize), `lifecycle/` (dispose), `input/`
 (pointer-gesture), `app/` (composition root). Behavior modules live in root
-`modules/` and use only the public surface.
+`modules/` (lighting, orbit, postprocessing + the `post/` effect catalogue) and
+use only the public surface. `site/` is the Vite-built public site — a marketing
+landing page plus one interactive page that is both the dev playground and the
+live post-processing demo, built on the real (published) package.
 
 The frame loop is backed by
 [`@tuomashatakka/canvas-loop-framecapper`](https://www.npmjs.com/package/@tuomashatakka/canvas-loop-framecapper)
@@ -94,5 +97,8 @@ cap applies page-globally.
 
 ## Scripts
 
-`npm run dev` (vite playground) · `npm test` (vitest) · `npm run typecheck` ·
-`npm run lint` · `npm run build` (tsc → `dist/`)
+`npm run dev` (build the package, then serve `site/` with Vite — the playground
++ live demo in one) · `npm test` (vitest) · `npm run typecheck` · `npm run lint` ·
+`npm run build` (tsc → `dist/`) · `npm run build:site` (Vite → `site/dist/`, the
+deployed site, which consumes the built package). CI builds both and publishes
+`site/dist` to GitHub Pages.

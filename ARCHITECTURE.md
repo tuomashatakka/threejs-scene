@@ -127,7 +127,10 @@ modules/                // behavior on top of the public API — flat, one file 
   post/                 //   WebGL effect catalogue (composer, pipeline, passes)
                         //     ported from threejs-scenes; only imports three
 
-playground/             // vite dev scene, not shipped
+site/                   // vite-built public site: landing (index.html) + one
+                        //   interactive page (app.html) that is BOTH the dev
+                        //   playground and the live post-processing demo. Imports
+                        //   the built package by name (dist), not the source.
 eslint.config.mjs
 tsconfig.json
 package.json
@@ -148,7 +151,9 @@ Rules that keep it lightweight and layered:
   (peers eslint ≥10 — satisfied).
 - **vitest** for unit tests colocated as `*.test.ts` — clock, store, loop,
   dispose, and module handling are testable headless via `tick()`.
-- **vite** for the playground only.
+- **vite** builds `site/` (multipage: landing + interactive app) → `site/dist`,
+  consuming the built package by name; `npm run dev` serves it. CI (`pages.yml`)
+  runs `tsc` then the Vite build and publishes `site/dist` to GitHub Pages.
 - **deps**: `@tuomashatakka/canvas-loop-framecapper@^1` (runtime),
   `three@>=0.160` (peer), `@types/three` (dev).
 
@@ -172,5 +177,6 @@ this plan blocks them.
 Post-processing landed as exactly such an additive layer: `postProcessing()` in
 `modules/`, wired through the module `render` hook (item 5 above), with the WebGL
 effect catalogue under `modules/post/`. A live, parametrized demo of every effect
-ships on the GitHub Pages site (`docs/demo.html`). WebGPU/TSL effects remain out
-of scope for now.
+ships on the GitHub Pages site (`site/app.html`) — the same page doubles as the
+dev playground, and it drives the real `postProcessing()` API on the built
+package (dogfooding). WebGPU/TSL effects remain out of scope for now.

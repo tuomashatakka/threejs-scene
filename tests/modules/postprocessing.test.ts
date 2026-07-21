@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { SceneContext, FrameContext } from 'Δ/index'
+import type { EffectContext } from 'ꭍ/postprocessing'
 
 // Real EffectComposer needs a live WebGL context, so we mock the composer
 // factory and assert the module wires the handle correctly. Pixel output is
@@ -97,6 +98,28 @@ describe('postProcessing', () => {
 
     expect(handle.setSize).toHaveBeenCalledWith(1024, 768)
     expect(setSize).toHaveBeenCalledWith(1024, 768)
+  })
+
+  it('effects receives the composer and its depth texture', () => {
+    let seen: EffectContext | undefined
+    postProcessing({ effects: ctx => {
+      seen = ctx; return []
+    } }).build(fakeCtx())
+
+    expect(seen?.composer).toBe(handle.composer)
+    expect(seen?.depthTexture).toBe(handle.composer.renderTarget1.depthTexture)
+    expect(seen?.width).toBe(800)
+    expect(seen?.height).toBe(600)
+  })
+
+  it('onResize runs with the size and scene context', () => {
+    const onResize = vi.fn()
+    const mod      = postProcessing({ onResize })
+    const ctx      = fakeCtx()
+    mod.build(ctx)
+    mod.resize?.({ width: 640, height: 480 }, ctx)
+
+    expect(onResize).toHaveBeenCalledWith({ width: 640, height: 480 }, ctx)
   })
 
   it('dispose tears down passes, bloom, and the composer', () => {

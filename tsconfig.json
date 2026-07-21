@@ -15,9 +15,11 @@
     "allowJs": true,
     "paths": {
       "Δ/*": ["./lib/*"],
-      "ꭍ/*": ["./modules/*"]
+      "ꭍ/*": ["./modules/*"],
+      "@tuomashatakka/threejs-scene": ["./lib/index.ts"],
+      "@tuomashatakka/threejs-scene/modules/*": ["./modules/*"]
     }
   },
-  "include": ["lib", "modules", "playground", "tests", "*.config.ts"],
-  "exclude": ["playground/vite.config.ts"]
+  "include": ["lib", "modules", "site", "tests", "*.config.ts"],
+  "exclude": ["site/vite.config.ts", "site/dist"]
 }

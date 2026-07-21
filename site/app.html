@@ -4,17 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>threejs-scene — post-processing playground</title>
-<meta name="description" content="Live, parametrized WebGL post-processing demo: toggle every ported effect and adjust its parameters against a running three.js scene.">
+<meta name="description" content="Live, parametrized WebGL post-processing demo: toggle every ported effect and adjust its parameters against a running three.js scene built on the library.">
 <link rel="stylesheet" href="./styles.css">
-<link rel="stylesheet" href="./demo.css">
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/"
-  }
-}
-</script>
+<link rel="stylesheet" href="./app.css">
 </head>
 <body data-demo>
 
@@ -28,14 +20,21 @@
       <button type="button" data-reset>Reset</button>
     </header>
     <p data-hint class="muted">Drag to orbit &middot; scroll to zoom. Toggle an effect, then tune its parameters.</p>
-    <div data-fx-list><!-- populated by demo.js --></div>
+
+    <label data-range data-speed>
+      <span>scene speed</span>
+      <output id="speed-out">1.0</output>
+      <input id="speed" type="range" min="0" max="4" step="0.1" value="1">
+    </label>
+
+    <div data-fx-list><!-- populated by app.ts --></div>
     <footer>
-      <small>WebGL &middot; three r184 &middot; effects ported from threejs-scenes</small>
+      <small>WebGL &middot; three r184 &middot; built on @tuomashatakka/threejs-scene</small>
     </footer>
   </aside>
 
   <noscript>This demo needs JavaScript and a WebGL2-capable browser.</noscript>
 
-  <script type="module" src="./demo.js"></script>
+  <script type="module" src="./app.ts"></script>
 </body>
 </html>

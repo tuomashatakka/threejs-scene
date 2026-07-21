@@ -13,9 +13,21 @@ import * as THREE from 'three'
 
 import { createComposer } from './post/composer.js'
 
-import type { AppModule, SceneContext, FrameContext } from '../lib/index'
+import type { AppModule, SceneContext, FrameContext, Size } from '../lib/index'
 import type { ComposerHandle } from './post/composer.js'
 import type { WebGlPassContext, Resizable, Pass } from './post/webgl/types.js'
+
+
+/**
+ * Context handed to {@link PostProcessingOptions.effects}: the usual
+ * {@link WebGlPassContext} plus the live composer and its shared depth texture,
+ * so depth-sampling passes (motion blur, dof+chromatic) can bind depth without
+ * the caller ever touching the composer directly.
+ */
+export interface EffectContext extends WebGlPassContext {
+  composer:     ComposerHandle['composer']
+  depthTexture: THREE.Texture | null
+}
 
 
 /** UnrealBloom settings for the base chain; see {@link createComposer}. */
@@ -49,12 +61,13 @@ export interface PostProcessingOptions {
   depth?: boolean
 
   /**
-   * Build the custom passes to insert before tone-mapping. Receives a
-   * {@link WebGlPassContext} (renderer/scene/camera + current pixel size);
-   * return the passes in the order they should run. Each is added via the
-   * composer's `addPassBeforeOutput`, so OutputPass always stays last.
+   * Build the custom passes to insert before tone-mapping. Receives an
+   * {@link EffectContext} (renderer/scene/camera + current pixel size, plus the
+   * composer and its depth texture); return the passes in the order they should
+   * run. Each is added via the composer's `addPassBeforeOutput`, so OutputPass
+   * always stays last.
    */
-  effects?: (ctx: WebGlPassContext) => Pass[]
+  effects?: (ctx: EffectContext) => Pass[]
 
   /**
    * Per-tick hook to drive time/camera-dependent uniforms on the passes you
@@ -64,6 +77,14 @@ export interface PostProcessingOptions {
    * touch the store.
    */
   onFrame?: (frame: FrameContext, ctx: SceneContext) => void
+
+  /**
+   * Per-resize hook, symmetric with {@link PostProcessingOptions.onFrame}. Runs
+   * after the composer and any `setSize`-carrying passes have been resized, for
+   * passes that track resolution through a plain uniform instead (e.g. sobel's
+   * `resolution`).
+   */
+  onResize?: (size: Size, ctx: SceneContext) => void
 }
 
 /**
@@ -94,8 +115,8 @@ export interface PostProcessingOptions {
 export function postProcessing<S extends object = Record<string, unknown>> (
   options: PostProcessingOptions = {},
 ): AppModule<S> {
-  const { bloom = {}, depth = false, effects, onFrame } = options
-  const bloomOpts                                       = bloom === false ? undefined : bloom
+  const { bloom = {}, depth = false, effects, onFrame, onResize } = options
+  const bloomOpts                                                 = bloom === false ? undefined : bloom
 
   let handle: ComposerHandle | null = null
   let passes: Pass[]                = []
@@ -122,7 +143,15 @@ export function postProcessing<S extends object = Record<string, unknown>> (
       })
 
       if (effects) {
-        passes = effects({ renderer: ctx.renderer, scene: ctx.scene, camera: ctx.camera, width, height })
+        passes = effects({
+          renderer:     ctx.renderer,
+          scene:        ctx.scene,
+          camera:       ctx.camera,
+          width,
+          height,
+          composer:     handle.composer,
+          depthTexture: handle.composer.renderTarget1.depthTexture ?? null,
+        })
         for (const pass of passes)
           handle.addPassBeforeOutput(pass)
       }
@@ -132,11 +161,12 @@ export function postProcessing<S extends object = Record<string, unknown>> (
       onFrame?.(frame, ctx)
     },
 
-    resize (size) {
+    resize (size, ctx) {
       handle?.setSize(size.width, size.height)
       // resolution-dependent passes carry their own setSize (see Resizable)
       for (const pass of passes)
         (pass as Partial<Resizable>).setSize?.(size.width, size.height)
+      onResize?.(size, ctx)
     },
 
     render (frame: FrameContext) {

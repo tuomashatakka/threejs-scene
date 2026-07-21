@@ -19,7 +19,7 @@
       successor core of <code>threejs-scenes</code> v3.
     </p>
     <div class="cta">
-      <a class="btn primary" href="./demo.html">Live demo</a>
+      <a class="btn primary" href="./app.html">Live demo</a>
       <a class="btn" href="https://github.com/tuomashatakka/threejs-scene">View on GitHub</a>
       <a class="btn" href="https://www.npmjs.com/package/@tuomashatakka/threejs-scene">npm</a>
     </div>
@@ -83,7 +83,8 @@ const app = createApp(canvas, {
 })</code></pre>
     <p class="muted">
       Every effect's parameters are adjustable live in the
-      <a href="./demo.html">interactive demo</a>.
+      <a href="./app.html">interactive demo</a>, which runs this exact scene on
+      the built package.
     </p>
   </section>
 
@@ -96,7 +97,7 @@ const app = createApp(canvas, {
       <div><dt>lib/lifecycle</dt><dd>Dispose — the strict teardown chain every module and the app itself follow.</dd></div>
       <div><dt>lib/input</dt><dd>Pointer-gesture — input capture that only ever reaches the scene through <code>dispatch</code>.</dd></div>
       <div><dt>lib/app</dt><dd>Composition root — <code>createApp</code>, wiring clock, store, renderer and modules together.</dd></div>
-      <div><dt>modules/</dt><dd>Behavior modules (lighting, orbit) built entirely on the public surface.</dd></div>
+      <div><dt>modules/</dt><dd>Behavior modules (lighting, orbit, postprocessing) built entirely on the public surface.</dd></div>
     </dl>
   </section>
 
