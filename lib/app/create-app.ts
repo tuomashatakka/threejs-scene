@@ -92,6 +92,9 @@ export interface AppOptions<S extends object, A = Partial<S>> {
   /**
    * Replaces the default `renderer.render(scene, camera)` — wire a composer
    * here. Receives the frame context (`delta` is the real frame delta).
+   * Takes precedence over any module's `render` hook (see {@link AppModule.render});
+   * prefer a pluggable module (e.g. `postProcessing()`) unless you need a
+   * one-off override at the composition root.
    */
   render?: (frame: FrameContext) => void
 
@@ -220,15 +223,28 @@ export function createApp<S extends object = Record<string, unknown>, A = Partia
   // modules — built immediately, updated in insertion order
   const active: AppModule<S>[] = []
 
+  // the module that owns the frame draw (last-mounted one defining `render`).
+  // Recomputed on every mount/remove so pump() stays a cheap lookup.
+  let renderModule: AppModule<S> | undefined
+
+  function recomputeRenderModule (): void {
+    renderModule = undefined
+    for (const module of active)
+      if (module.render)
+        renderModule = module
+  }
+
   function mountModule (module: AppModule<S>): ModuleHandle {
     module.build(ctx)
     active.push(module)
+    recomputeRenderModule()
     return {
       name: module.name,
       remove () {
         const index = active.indexOf(module)
         if (index >= 0)
           active.splice(index, 1)
+        recomputeRenderModule()
         module.dispose?.()
       },
     }
@@ -259,12 +275,18 @@ export function createApp<S extends object = Record<string, unknown>, A = Partia
       module.update?.(current, frameCtx, ctx)
   }
 
-  // one pump per real frame: 0..n sim ticks, then exactly one render
+  // one pump per real frame: 0..n sim ticks, then exactly one render.
+  // Draw path priority: the AppOptions.render override, else a module's
+  // render hook (post-processing composer), else the plain scene render.
   function pump (realDelta: number): void {
     for (const delta of clock.advance(realDelta))
       step(delta)
+
+    const frameCtx: FrameContext = { delta: realDelta, elapsed: clock.elapsed(), frame }
     if (render)
-      render({ delta: realDelta, elapsed: clock.elapsed(), frame })
+      render(frameCtx)
+    else if (renderModule)
+      renderModule.render!(frameCtx, ctx)
     else
       renderer.render(scene, camera)
   }

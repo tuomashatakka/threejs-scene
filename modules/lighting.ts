@@ -5,7 +5,7 @@
 // proving the module contract is sufficient for built-ins.
 
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
 import type { AppModule, SceneContext, Vec3 } from '../lib/index'
 
@@ -97,7 +97,7 @@ function applyEnvironment (ctx: SceneContext, { intensity = 1 }: LightingEnvOpti
   ctx.scene.environment          = envTexture
   ctx.scene.environmentIntensity = intensity
   pmrem.dispose()
-  envScene.traverse(obj => (obj as THREE.Mesh).geometry?.dispose())
+  envScene.traverse((obj: THREE.Object3D) => (obj as THREE.Mesh).geometry?.dispose())
   return envTexture
 }
 

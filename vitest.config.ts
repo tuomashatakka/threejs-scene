@@ -4,8 +4,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      'Δ': './lib',
-      'ꭍ': './modules',
+      Δ: './lib',
+      ꭍ: './modules',
     },
   },
   test: {

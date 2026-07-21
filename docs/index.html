@@ -19,7 +19,8 @@
       successor core of <code>threejs-scenes</code> v3.
     </p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/tuomashatakka/threejs-scene">View on GitHub</a>
+      <a class="btn primary" href="./demo.html">Live demo</a>
+      <a class="btn" href="https://github.com/tuomashatakka/threejs-scene">View on GitHub</a>
       <a class="btn" href="https://www.npmjs.com/package/@tuomashatakka/threejs-scene">npm</a>
     </div>
   </header>
@@ -56,6 +57,34 @@
         <p>Every module tears down cleanly. <code>app.dispose()</code> walks the chain so nothing leaks between scenes.</p>
       </div>
     </div>
+  </section>
+
+  <section>
+    <h2>Post-processing</h2>
+    <p>
+      Post-processing is a pluggable module, same contract as the lighting and
+      orbit modules: drop <code>postProcessing()</code> into <code>use: []</code>
+      and it owns the frame draw through a module <code>render</code> hook — no
+      composer wiring at the call site. The WebGL effect catalogue (bloom, god
+      rays, colour grade, DOF, CRT, glitch, chromatic aberration, and more) is
+      ported from <code>threejs-scenes</code>.
+    </p>
+    <pre><code>import { postProcessing } from '@tuomashatakka/threejs-scene/modules/postprocessing'
+import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
+
+const app = createApp(canvas, {
+  use: [
+    standardLighting(),
+    postProcessing({
+      bloom:   { strength: 0.8 },
+      effects: () =&gt; [ createChromaticAberration({ strength: 1.2 }) ],
+    }),
+  ],
+})</code></pre>
+    <p class="muted">
+      Every effect's parameters are adjustable live in the
+      <a href="./demo.html">interactive demo</a>.
+    </p>
   </section>
 
   <section>

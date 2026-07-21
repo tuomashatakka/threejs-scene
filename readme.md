@@ -45,6 +45,41 @@ simulation tick), input flows back through `setState`/`dispatch` — never
 straight into scene objects. Same seed + same tick sequence reproduce the
 exact same world, headless included.
 
+## Post-processing
+
+Post-processing is a pluggable module, same contract as lighting and orbit —
+drop it into `use: [ … ]` and it owns the frame draw through a module `render`
+hook (no composer wiring at the call site):
+
+```ts
+import { postProcessing } from '@tuomashatakka/threejs-scene/modules/postprocessing'
+import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
+import { createGradePass } from '@tuomashatakka/threejs-scene/modules/post'
+
+const app = createApp(canvas, {
+  use: [
+    standardLighting(),
+    postProcessing({
+      bloom:   { strength: 0.8 },
+      depth:   true,                       // for DOF / god rays / motion blur
+      effects: () => [ createChromaticAberration({ strength: 1.2 }), createGradePass({}) ],
+      onFrame: ({ elapsed }, ctx) => { /* drive time/camera uniforms */ },
+    }),
+  ],
+})
+app.start()
+```
+
+It builds an `EffectComposer` (`RenderPass → optional UnrealBloom → your passes
+→ OutputPass`, tone-mapped once at OutputPass). The WebGL effect catalogue —
+bloom, god rays, colour grade, DOF, CRT, glitch, chromatic aberration, film
+grain, and more — lives under `modules/post/` (top-level passes) and
+`modules/post/webgl/` (the full set), ported from `threejs-scenes`. WebGL only
+for now.
+
+Every effect's parameters are adjustable live in the
+[interactive demo](https://tuomashatakka.github.io/threejs-scene/demo.html).
+
 ## Layout
 
 `lib/` is grouped by function — `time/` (clock, loop), `state/` (store, rng),

@@ -171,6 +171,52 @@ describe('createApp', () => {
     app.dispose()
   })
 
+  it("a module's render hook replaces the default renderer.render", () => {
+    const render   = vi.fn()
+    const renderer = fakeRenderer()
+    const app      = createApp<State>(canvas(), {
+      renderer,
+      use: [ defineModule<State>({ name: 'post', build: () => {}, render }) ],
+    })
+
+    app.tick(0.03)
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ delta: 0.03 }), app.ctx)
+    expect(renderer.render).not.toHaveBeenCalled()
+    app.dispose()
+  })
+
+  it('AppOptions.render takes precedence over a module render hook', () => {
+    const optionRender = vi.fn()
+    const moduleRender = vi.fn()
+    const app          = createApp<State>(canvas(), {
+      renderer: fakeRenderer(),
+      render:   optionRender,
+      use:      [ defineModule<State>({ name: 'post', build: () => {}, render: moduleRender }) ],
+    })
+
+    app.tick()
+    expect(optionRender).toHaveBeenCalledTimes(1)
+    expect(moduleRender).not.toHaveBeenCalled()
+    app.dispose()
+  })
+
+  it('falls back to renderer.render after a render-owning module is removed', () => {
+    const render   = vi.fn()
+    const renderer = fakeRenderer()
+    const app      = createApp<State>(canvas(), { renderer })
+    const handle   = app.use(defineModule<State>({ name: 'post', build: () => {}, render }))
+
+    app.tick()
+    expect(render).toHaveBeenCalledTimes(1)
+    expect(renderer.render).not.toHaveBeenCalled()
+
+    handle.remove()
+    app.tick()
+    expect(render).toHaveBeenCalledTimes(1) // no longer driven
+    expect(renderer.render).toHaveBeenCalledTimes(1) // default restored
+    app.dispose()
+  })
+
   it('dispose tears down modules in reverse order, then scene and renderer', () => {
     const order: string[] = []
     const renderer        = fakeRenderer()

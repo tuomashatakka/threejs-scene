@@ -10,7 +10,8 @@ import type { FrameContext, SceneContext, Size } from '../types'
 /**
  * A scene feature in the unidirectional flow. `build` creates objects once;
  * `update` projects the current state onto them every simulation tick;
- * `resize` reacts to viewport changes; `dispose` tears everything down.
+ * `resize` reacts to viewport changes; `render` optionally takes over the
+ * frame's draw; `dispose` tears everything down.
  */
 export interface AppModule<S extends object = Record<string, unknown>> {
   name: string
@@ -23,6 +24,16 @@ export interface AppModule<S extends object = Record<string, unknown>> {
 
   /** React to viewport size changes (ortho frustums, HUD layout, …). */
   resize? (size: Size, ctx: SceneContext): void
+
+  /**
+   * Take over the frame's draw, replacing the default
+   * `renderer.render(scene, camera)` — wire an {@link https://threejs.org/docs/#examples/en/postprocessing/EffectComposer | EffectComposer}
+   * here. A module that defines `render` becomes a pluggable post-processing
+   * layer: drop it into `use: []` and it owns the render, no `AppOptions.render`
+   * needed. When several active modules define `render`, the last-mounted one
+   * wins; a top-level `AppOptions.render` overrides all of them.
+   */
+  render? (frame: FrameContext, ctx: SceneContext): void
 
   /** Tear down everything `build` created. */
   dispose? (): void

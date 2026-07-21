@@ -37,7 +37,10 @@ scope.
    handling.
 5. **Untyped render override** → `render?: (frame: FrameContext) => void`
    receives the frame context, so composer wiring gets `delta` without closure
-   tricks.
+   tricks. A module may also declare `render(frame, ctx)`: `pump` uses the
+   last-mounted render-owning module in place of the default draw (the
+   `AppOptions.render` override still wins over all of them). This is what makes
+   `postProcessing()` a pluggable module rather than call-site wiring.
 6. **Global fps-cap leak** (framecapper cap is page-wide) → surfaced honestly
    in the `loop.fps` docs; the loop adapter is the only code touching it.
 
@@ -119,6 +122,10 @@ lib/
 modules/                // behavior on top of the public API — flat, one file each
   lighting.ts           //   standardLighting()
   orbit.ts              //   orbitControls() — uses lib/input/pointer-gesture
+  postprocessing.ts     //   postProcessing() — owns an EffectComposer via the
+                        //     module render hook; pluggable like the others
+  post/                 //   WebGL effect catalogue (composer, pipeline, passes)
+                        //     ported from threejs-scenes; only imports three
 
 playground/             // vite dev scene, not shipped
 eslint.config.mjs
@@ -159,5 +166,11 @@ Rules that keep it lightweight and layered:
 
 Lifecycle event emitter, async `app.ready`, worker update bridges, a
 declarative JSX layer (and possibly a react adapter) on top of this same core,
-post-processing, particles, voxels, instancing. Each lands as an additive
-layer — nothing in this plan blocks them.
+particles, voxels, instancing. Each lands as an additive layer — nothing in
+this plan blocks them.
+
+Post-processing landed as exactly such an additive layer: `postProcessing()` in
+`modules/`, wired through the module `render` hook (item 5 above), with the WebGL
+effect catalogue under `modules/post/`. A live, parametrized demo of every effect
+ships on the GitHub Pages site (`docs/demo.html`). WebGPU/TSL effects remain out
+of scope for now.
