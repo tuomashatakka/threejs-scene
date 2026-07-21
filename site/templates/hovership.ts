@@ -365,7 +365,7 @@ function shipPilot (rig: FollowCamera, telemetry: Telemetry): AppModule<RaceStat
       rig.update(ship.position, ship.quaternion, frame.delta)
 
       // Focal length rides the speed itself rather than the throttle: a wider
-      // lens at 60 units/s, back to normal in the hairpin.
+      // lens flat out down a straight, back to normal in the slow corners.
       const pace   = (telemetry.speed - state.cornerSpeed) / Math.max(1, state.straightSpeed - state.cornerSpeed)
       const wanted = FOV_BASE + Math.max(0, Math.min(1, pace)) * FOV_KICK
       if (Math.abs(wanted - fov) > 0.01) {

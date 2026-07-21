@@ -37,7 +37,7 @@ const STARTERS: Starter[] = [
   {
     id:     'isometric',
     title:  'Isometric endless scape',
-    blurb:  'Orthographic tilt-shift over terrain that scrolls forever — 4,096 columns in one draw call.',
+    blurb:  'Pannable, zoomable tilt-shift over endless terrain. Zoom in and the rig tilts up as the bokeh thickens.',
     file:   'templates/isometric.ts',
     source: isometricSource,
     mount:  asStarterMount(mountIsometric as never),
@@ -45,7 +45,7 @@ const STARTERS: Starter[] = [
   {
     id:     'hovership',
     title:  'Hovership racer',
-    blurb:  'Third-person chase camera on a procedural circuit. Drag to steer.',
+    blurb:  'Chase camera on a procedural circuit. Flat out on the straights, and the focus racks with the throttle.',
     file:   'templates/hovership.ts',
     source: hovershipSource,
     mount:  asStarterMount(mountHovership as never),
@@ -53,7 +53,7 @@ const STARTERS: Starter[] = [
   {
     id:     'product',
     title:  'Product display',
-    blurb:  'Studio lighting, transmission glass, drag-to-spin turntable with inertia.',
+    blurb:  'Studio lighting and transmission glass, with the camera revolving and the pointer leaning the rig.',
     file:   'templates/product.ts',
     source: productSource,
     mount:  asStarterMount(mountProduct as never),

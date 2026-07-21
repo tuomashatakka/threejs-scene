@@ -94,6 +94,21 @@ each showing its complete source beside the running scene. The source is
 imported twice (as a module to run, and via Vite's `?raw` to display), so the
 code you read is provably the code you are watching.
 
+Each one is a worked example of tying a camera to something else in the scene:
+
+- **Isometric** — drag to pan, wheel/pinch to zoom. One `zoom` number drives the
+  frustum, the rig's elevation, the fog band and the tilt-shift blur together,
+  so zooming in tips the camera up toward the horizon as the bokeh thickens.
+  Panning moves the terrain's *sample origin* rather than the camera, which is
+  why the map is endless in every direction.
+- **Hovership** — the ship reads the track's curvature ahead and brakes exactly
+  as late as it can, so it runs flat out down the straights. The camera racks
+  focus off that throttle: out to the horizon under acceleration, back onto the
+  ship under braking, with the aperture opening through both.
+- **Product** — the camera revolves around a product that never moves (so the
+  key light rakes across it, which spinning the object cannot fake), and the
+  pointer leans the rig a few degrees for parallax.
+
 ## Content: props, materials, textures
 
 `modules/assets` is the content layer — plain factories rather than app modules:
@@ -126,17 +141,24 @@ Beyond the default perspective rig, `createApp({ camera })` accepts any prebuilt
 camera — including the two the library ships:
 
 ```ts
-import { createIsoCamera, resizeIsoCamera, createFollowCamera } from '@tuomashatakka/threejs-scene'
+import { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from '@tuomashatakka/threejs-scene'
 
 const camera = createIsoCamera(aspect, { viewSize: 20, flavor: 'dimetric' })
 const rig    = createFollowCamera({ offset: [ 0, 2.6, -7.5 ] })
+
+camera.userData.viewSize = 12          // zoom is a frustum change …
+resizeIsoCamera(camera, aspect)
+aimIsoCamera(camera, { tilt: 22 })     // … and elevation is a pose change
 ```
 
 `createIsoCamera` builds a true-iso or dimetric orthographic rig;
 `createFollowCamera` is a damped third-person chase camera whose offset is
 expressed in the target's local space, so it banks and turns with it. Ortho
 frustums are not handled by the built-in resize (it only fixes perspective
-aspect) — call `resizeIsoCamera` from a module `resize` hook.
+aspect) — call `resizeIsoCamera` from a module `resize` hook. `aimIsoCamera`
+re-aims a built rig at runtime, falling back to whatever pose it already has for
+every field you omit, so a zoom handler can swing the tilt without knowing the
+rest of the setup.
 
 ## Layout
 

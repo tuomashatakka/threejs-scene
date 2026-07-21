@@ -1,3 +1,6 @@
 .DS_Store
 dist/
 node_modules/
+
+# playwright-mcp scratch output
+.playwright-mcp/

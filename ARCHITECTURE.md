@@ -110,14 +110,15 @@ lib/
     resize.ts           //   ResizeObserver wiring + fan-out to modules
 
   camera/               // prebuilt rigs for createApp's `camera` option
-    iso.ts              //   createIsoCamera / resizeIsoCamera (ortho true-iso|dimetric)
+    iso.ts              //   createIsoCamera / resizeIsoCamera / aimIsoCamera
+                        //     (ortho true-iso|dimetric; frustum and pose move separately)
     follow.ts           //   createFollowCamera: damped third-person chase rig
 
   lifecycle/            // teardown (observability lands here later)
     dispose.ts          //   recursive scene teardown
 
   input/                // how intent enters the system
-    pointer-gesture.ts  //   unified drag / pinch / wheel
+    pointer-gesture.ts  //   unified drag / pinch / wheel / tap / hover
 
   app/                  // composition root
     create-app.ts       //   createApp: composes the layers above, nothing more
@@ -148,7 +149,8 @@ site/                   // vite-built public site: landing (index.html), one
                         //   starters gallery (starters.html) whose templates are
                         //   imported twice — as modules to run, and via ?raw to
                         //   display. Imports the built package by name (dist).
-  templates/            //   the three runnable starter apps
+  templates/            //   the three runnable starter apps — each one a worked
+                        //     example of driving a camera from app state
 eslint.config.mjs
 tsconfig.json
 package.json

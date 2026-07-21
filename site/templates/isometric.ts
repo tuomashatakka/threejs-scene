@@ -63,11 +63,13 @@ const ZOOM_MAX  = 3
 const TILT_WIDE  = 34
 const TILT_CLOSE = 19
 // Tilt-shift strength/band at either end. Closer = a thicker blur over a
-// narrower sharp band, which is exactly how a real tilted lens behaves.
-const BLUR_WIDE  = 1.3
-const BLUR_CLOSE = 5.4
-const BAND_WIDE  = 0.3
-const BAND_CLOSE = 0.11
+// narrower sharp band, which is exactly how a real tilted lens behaves. Tuned
+// so zoom 1 lands on 2.6/0.18 — the fixed values this scene used before it
+// could zoom at all.
+const BLUR_WIDE  = 1.6
+const BLUR_CLOSE = 5.8
+const BAND_WIDE  = 0.22
+const BAND_CLOSE = 0.1
 
 const lerp      = (a: number, b: number, t: number): number => a + (b - a) * t
 const clampZoom = (zoom: number): number => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom))
