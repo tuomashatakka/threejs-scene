@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>threejs-scene — starter templates</title>
+<meta name="description" content="Three scaffolded three.js starters — isometric endless scape, third-person hovership racer, and a studio product display — each shown as its complete source beside the running scene.">
+<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./starters.css">
+</head>
+<body data-starters>
+
+  <header data-bar>
+    <a class="back" href="./index.html">&larr; threejs-scene</a>
+    <nav data-tabs aria-label="Starter templates">
+      <!-- buttons injected by starters.ts, one per template -->
+    </nav>
+    <a class="back" href="./app.html">post-processing demo &rarr;</a>
+  </header>
+
+  <main data-split>
+
+    <section data-preview aria-label="Live preview">
+      <!-- the renderer sizes itself to the canvas PARENT, so the stage wraps the
+           canvas alone — the caption must not share that box -->
+      <div data-stage></div>
+      <p data-caption>
+        <strong data-title>&nbsp;</strong>
+        <span data-blurb class="muted">&nbsp;</span>
+      </p>
+    </section>
+
+    <section data-source aria-label="Template source">
+      <header>
+        <span data-filename class="muted">&nbsp;</span>
+        <button type="button" data-copy>Copy</button>
+      </header>
+      <pre><code data-code>&nbsp;</code></pre>
+    </section>
+
+  </main>
+
+  <noscript>These starters need JavaScript and a WebGL2-capable browser.</noscript>
+
+  <script type="module" src="./starters.ts"></script>
+</body>
+</html>

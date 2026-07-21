@@ -9,23 +9,19 @@ import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import type { Pass } from 'three/addons/postprocessing/Pass.js'
 
+import { FULLSCREEN_VERTEX } from '../shared/glsl.js'
+
 
 const RADIAL_BLUR_SHADER = {
   uniforms: {
     tDiffuse:  { value: null },
     uCenter:   { value: new THREE.Vector2(0.5, 0.5) },
-    uWeight:   { value: 0.9 },
-    uDecay:    { value: 0.95 },
-    uExposure: { value: 5 },
+    uWeight:   { value: 1.0 },
+    uDecay:    { value: 0.92 },
+    uExposure: { value: 1.0 },
     uCount:    { value: 32 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform vec2 uCenter;
@@ -39,13 +35,18 @@ const RADIAL_BLUR_SHADER = {
       vec2 coord = vUv;
       vec3 sum = vec3(0.0);
       float illum = uWeight;
+      float totalWeight = 0.0;
       for (int i = 0; i < 128; i++) {
         if (i >= uCount) break;
         coord -= delta;
         sum += texture2D(tDiffuse, coord).rgb * illum;
+        totalWeight += illum;
         illum *= uDecay;
       }
-      sum /= float(uCount);
+      // Normalise by the accumulated weight (NOT the sample count) so the result
+      // is a true weighted average — brightness is preserved. uExposure is then
+      // an explicit, honest gain rather than a hidden count/weight ratio.
+      sum /= max(totalWeight, 1e-4);
       sum *= uExposure;
       gl_FragColor = vec4(sum, texture2D(tDiffuse, vUv).a);
     }
@@ -54,19 +55,20 @@ const RADIAL_BLUR_SHADER = {
 
 export interface RadialBlurOptions {
   center?:   THREE.Vector2
-  // Base weight per sample, [0,1].
+  // Base weight of the first sample, [0,1].
   weight?:   number
-  // Per-iteration weight falloff, [0,1]. Raise it if you raise count to avoid darkening.
+  // Per-iteration weight falloff, [0,1]. Lower = a tighter, shorter smear.
   decay?:    number
   // Iteration count, recommended [16,64].
   count?:    number
-  // Overall brightness multiplier.
+  // Overall brightness gain applied after normalisation. 1.0 preserves brightness;
+  // raise it for a glowing shaft look.
   exposure?: number
 }
 
 export function createRadialBlur (options: RadialBlurOptions = {}): Pass {
-  const { center = new THREE.Vector2(0.5, 0.5), weight = 0.9, decay = 0.95, count = 32, exposure = 5 } = options
-  const pass                                                                                           = new ShaderPass(RADIAL_BLUR_SHADER);
+  const { center = new THREE.Vector2(0.5, 0.5), weight = 1.0, decay = 0.92, count = 32, exposure = 1.0 } = options
+  const pass                                                                                             = new ShaderPass(RADIAL_BLUR_SHADER);
   (pass.uniforms.uCenter!.value as THREE.Vector2).copy(center)
   pass.uniforms.uWeight!.value   = weight
   pass.uniforms.uDecay!.value    = decay

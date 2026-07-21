@@ -52,9 +52,8 @@ drop it into `use: [ … ]` and it owns the frame draw through a module `render`
 hook (no composer wiring at the call site):
 
 ```ts
-import { postProcessing } from '@tuomashatakka/threejs-scene/modules/postprocessing'
+import { postProcessing, createGradePass } from '@tuomashatakka/threejs-scene/modules/post'
 import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
-import { createGradePass } from '@tuomashatakka/threejs-scene/modules/post'
 
 const app = createApp(canvas, {
   use: [
@@ -73,22 +72,86 @@ app.start()
 It builds an `EffectComposer` (`RenderPass → optional UnrealBloom → your passes
 → OutputPass`, tone-mapped once at OutputPass). The WebGL effect catalogue —
 bloom, god rays, colour grade, DOF, CRT, glitch, chromatic aberration, film
-grain, and more — lives under `modules/post/` (top-level passes) and
-`modules/post/webgl/` (the full set), ported from `threejs-scenes`. WebGL only
-for now.
+grain, and more — lives under `modules/post/` (the module plus the top-level
+passes) and `modules/post/webgl/` (the full set). WebGL only for now.
+
+Each effect exists exactly once. The shared GLSL kernels — the fullscreen vertex
+shader, `hash`, chromatic aberration, vignette, grain — live in
+`modules/post/shared/glsl.ts` and are composed into each pass, rather than being
+re-inlined per file. Passes that own a look keep it: `createGradePass` defaults
+its baked grain and chromatic aberration to `0`, so stacking it with
+`createFilmGrainPass`/`createChromaticAberration` never double-applies either.
 
 Every effect's parameters are adjustable live in the
-[interactive demo](https://tuomashatakka.github.io/threejs-scene/demo.html).
+[interactive demo](https://tuomashatakka.github.io/threejs-scene/app.html).
+
+## Starter templates
+
+Three scaffolded apps — an isometric tilt-shift endless scape, a third-person
+hovership racer, and a studio product display — are on the
+[starters page](https://tuomashatakka.github.io/threejs-scene/starters.html),
+each showing its complete source beside the running scene. The source is
+imported twice (as a module to run, and via Vite's `?raw` to display), so the
+code you read is provably the code you are watching.
+
+## Content: props, materials, textures
+
+`modules/assets` is the content layer — plain factories rather than app modules:
+
+```ts
+import { Prop, markShared, createStandardMaterial, treeProp } from '@tuomashatakka/threejs-scene/modules/assets'
+
+const ship = new Prop('ship')
+  .addPart('hull', new THREE.Mesh(hullGeometry, createStandardMaterial('metal')))
+  .addPart('canopy', new THREE.Mesh(domeGeometry, createStandardMaterial('glass')))
+
+scene.add(ship)
+ship.dispose()   // frees every geometry/material/texture it owns, exactly once
+```
+
+A `Prop` is a `THREE.Group` of child meshes with a disposal contract: it owns
+everything it contains **unless** the resource is tagged with `markShared()`.
+That makes sharing a pooled material a deliberate, visible act, and keeps
+`dispose()` safe to call without blanking a neighbour's material.
+
+Also here: `MATERIAL_PRESETS` (`metal`, `chrome`, `gold`, `plastic`, `rubber`,
+`glass`, `matte`, `emissive`), `createToonMaterial`, seeded DOM-free procedural
+textures (`createGridTexture`, `createNoiseTexture`, `createGradientTexture`),
+and a starter prop catalogue (`crystalProp`, `rockProp`, `treeProp`,
+`lampPostProp`).
+
+## Cameras
+
+Beyond the default perspective rig, `createApp({ camera })` accepts any prebuilt
+camera — including the two the library ships:
+
+```ts
+import { createIsoCamera, resizeIsoCamera, createFollowCamera } from '@tuomashatakka/threejs-scene'
+
+const camera = createIsoCamera(aspect, { viewSize: 20, flavor: 'dimetric' })
+const rig    = createFollowCamera({ offset: [ 0, 2.6, -7.5 ] })
+```
+
+`createIsoCamera` builds a true-iso or dimetric orthographic rig;
+`createFollowCamera` is a damped third-person chase camera whose offset is
+expressed in the target's local space, so it banks and turns with it. Ortho
+frustums are not handled by the built-in resize (it only fixes perspective
+aspect) — call `resizeIsoCamera` from a module `resize` hook.
 
 ## Layout
 
 `lib/` is grouped by function — `time/` (clock, loop), `state/` (store, rng),
-`render/` (renderer, resize), `lifecycle/` (dispose), `input/`
-(pointer-gesture), `app/` (composition root). Behavior modules live in root
-`modules/` (lighting, orbit, postprocessing + the `post/` effect catalogue) and
-use only the public surface. `site/` is the Vite-built public site — a marketing
-landing page plus one interactive page that is both the dev playground and the
-live post-processing demo, built on the real (published) package.
+`render/` (renderer, resize), `camera/` (iso + follow rigs), `lifecycle/`
+(dispose), `input/` (pointer-gesture), `app/` (composition root).
+
+Every entry in `modules/` is a folder with an `index.ts` — `lighting/`,
+`orbit/`, `post/` (the post-processing module, its passes, `shared/` GLSL, and
+the `webgl/` catalogue), and `assets/` (props, materials, textures). They use
+only the public surface.
+
+`site/` is the Vite-built public site: a landing page, one interactive page that
+is both the dev playground and the live post-processing demo, and the starters
+gallery — all built on the real (published) package.
 
 The frame loop is backed by
 [`@tuomashatakka/canvas-loop-framecapper`](https://www.npmjs.com/package/@tuomashatakka/canvas-loop-framecapper)
@@ -99,6 +162,9 @@ cap applies page-globally.
 
 `npm run dev` (build the package, then serve `site/` with Vite — the playground
 + live demo in one) · `npm test` (vitest) · `npm run typecheck` · `npm run lint` ·
-`npm run build` (tsc → `dist/`) · `npm run build:site` (Vite → `site/dist/`, the
-deployed site, which consumes the built package). CI builds both and publishes
-`site/dist` to GitHub Pages.
+`npm run build` (clean, then tsc → `dist/`) · `npm run build:site` (Vite →
+`site/dist/`, the deployed site, which consumes the built package). CI builds
+both and publishes `site/dist` to GitHub Pages.
+
+`build` cleans `dist/` first on purpose: `tsc` never removes stale output, so a
+renamed or deleted module would otherwise linger and keep resolving.

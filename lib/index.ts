@@ -24,6 +24,10 @@ export { createStore } from './state/store'
 export { createSeededRng, mulberry32 } from './state/rng'
 export type { Store, Reducer, StoreListener } from './state/store'
 
+// camera — prebuilt rigs for createApp's `camera` option
+export { createIsoCamera, resizeIsoCamera, createFollowCamera } from './camera/index'
+export type { IsoCameraOptions, FollowCamera, FollowCameraOptions } from './camera/index'
+
 // render — how it reaches the screen
 export { createRenderer } from './render/renderer'
 export { attachResizeObserver } from './render/resize'

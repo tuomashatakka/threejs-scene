@@ -4,14 +4,8 @@
 
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX, GLSL_HASH, GLSL_CHROMATIC } from './shared/glsl.js'
 
-const FULL_SCREEN_VERTEX = /* glsl */`
-  varying vec2 vUv;
-  void main () {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
 
 const RGB_SHIFT_SHADER = {
   uniforms: {
@@ -20,17 +14,15 @@ const RGB_SHIFT_SHADER = {
     uIntensity: { value: 0.5 },
     uAngle:     { value: 0.0 },
   },
-  vertexShader:   FULL_SCREEN_VERTEX,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime, uIntensity, uAngle;
     varying vec2 vUv;
+    ${GLSL_CHROMATIC}
     void main () {
       vec2 off = vec2(cos(uAngle), sin(uAngle)) * (0.005 * uIntensity);
-      float r = texture2D(tDiffuse, vUv + off).r;
-      float g = texture2D(tDiffuse, vUv).g;
-      float b = texture2D(tDiffuse, vUv - off).b;
-      gl_FragColor = vec4(r, g, b, 1.0);
+      gl_FragColor = vec4(chromaticSample(tDiffuse, vUv, off), texture2D(tDiffuse, vUv).a);
     }
   `,
 }
@@ -42,16 +34,16 @@ const BLOCK_DISPLACEMENT_SHADER = {
     uIntensity: { value: 0.5 },
     uBlockSize: { value: 32.0 },
   },
-  vertexShader:   FULL_SCREEN_VERTEX,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime, uIntensity, uBlockSize;
     varying vec2 vUv;
-    float hash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    ${GLSL_HASH}
     void main () {
       vec2 res = vec2(uBlockSize);
       vec2 block = floor(vUv * res) / res;
-      float h = hash(block + floor(uTime * 12.0));
+      float h = hash21(block + floor(uTime * 12.0));
       float threshold = 1.0 - uIntensity * 0.4;
       vec2 shift = vec2(0.0);
       if (h > threshold) shift.x = (h - threshold) * 0.3 * sign(h - 0.5);
@@ -68,7 +60,7 @@ const SCAN_CORRUPTION_SHADER = {
     uTime:      { value: 0 },
     uIntensity: { value: 0.5 },
   },
-  vertexShader:   FULL_SCREEN_VERTEX,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime, uIntensity;

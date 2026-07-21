@@ -10,6 +10,22 @@
       "types": "./dist/lib/index.d.ts",
       "import": "./dist/lib/index.js"
     },
+    "./modules/lighting": {
+      "types": "./dist/modules/lighting/index.d.ts",
+      "import": "./dist/modules/lighting/index.js"
+    },
+    "./modules/orbit": {
+      "types": "./dist/modules/orbit/index.d.ts",
+      "import": "./dist/modules/orbit/index.js"
+    },
+    "./modules/post": {
+      "types": "./dist/modules/post/index.d.ts",
+      "import": "./dist/modules/post/index.js"
+    },
+    "./modules/assets": {
+      "types": "./dist/modules/assets/index.d.ts",
+      "import": "./dist/modules/assets/index.js"
+    },
     "./modules/*": {
       "types": "./dist/modules/*.d.ts",
       "import": "./dist/modules/*.js"
@@ -21,7 +37,8 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "build:site": "vite build site",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

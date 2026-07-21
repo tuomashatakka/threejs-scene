@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { SceneContext, FrameContext } from 'Δ/index'
-import type { EffectContext } from 'ꭍ/postprocessing'
+import type { EffectContext } from 'ꭍ/post'
 
 // Real EffectComposer needs a live WebGL context, so we mock the composer
 // factory and assert the module wires the handle correctly. Pixel output is
@@ -20,10 +20,10 @@ const { composerSpy, handle } = vi.hoisted(() => {
 })
 
 // mock path is relative to this test file so it resolves to the exact same
-// module id as postprocessing.ts's own `./post/composer.js` import
+// module id as post/index.ts's own `./composer.js` import
 vi.mock('../../modules/post/composer.js', () => ({ createComposer: composerSpy }))
 
-const { postProcessing } = await import('ꭍ/postprocessing')
+const { postProcessing } = await import('ꭍ/post')
 
 function fakeCtx (): SceneContext {
   return {

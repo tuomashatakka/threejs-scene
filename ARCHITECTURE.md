@@ -109,6 +109,10 @@ lib/
     renderer.ts         //   WebGLRenderer factory (color/tonemap/shadow defaults)
     resize.ts           //   ResizeObserver wiring + fan-out to modules
 
+  camera/               // prebuilt rigs for createApp's `camera` option
+    iso.ts              //   createIsoCamera / resizeIsoCamera (ortho true-iso|dimetric)
+    follow.ts           //   createFollowCamera: damped third-person chase rig
+
   lifecycle/            // teardown (observability lands here later)
     dispose.ts          //   recursive scene teardown
 
@@ -119,18 +123,32 @@ lib/
     create-app.ts       //   createApp: composes the layers above, nothing more
     module.ts           //   defineModule + runtime handles (use/remove)
 
-modules/                // behavior on top of the public API — flat, one file each
-  lighting.ts           //   standardLighting()
-  orbit.ts              //   orbitControls() — uses lib/input/pointer-gesture
-  postprocessing.ts     //   postProcessing() — owns an EffectComposer via the
-                        //     module render hook; pluggable like the others
-  post/                 //   WebGL effect catalogue (composer, pipeline, passes)
-                        //     ported from threejs-scenes; only imports three
+modules/                // behavior on top of the public API — every entry is a
+                        //   FOLDER with an index.ts, never a loose file
+  lighting/index.ts     //   standardLighting()
+  orbit/index.ts        //   orbitControls() — uses lib/input/pointer-gesture
+  post/                 //   post-processing: the module + the effect catalogue
+    index.ts            //     postProcessing() — owns an EffectComposer via the
+                        //       module render hook; pluggable like the others.
+                        //       Also re-exports composer + the used passes.
+    shared/glsl.ts      //     the shared GLSL kernels (fullscreen VS, hash,
+                        //       chromatic, vignette, grain) — composed into each
+                        //       pass so no kernel is written twice
+    *.ts                //     standalone passes (grade, glitch, god-rays, …)
+    webgl/              //     the WebGL effect catalogue; each effect exists once
+  assets/               //   content layer: plain factories, not app modules
+    prop.ts             //     Prop (a Group of meshes) + the ownership contract
+    materials.ts        //     MATERIAL_PRESETS, createStandardMaterial, toon
+    textures.ts         //     seeded, DOM-free procedural DataTextures
+    props.ts            //     starter catalogue built on Prop
 
-site/                   // vite-built public site: landing (index.html) + one
+site/                   // vite-built public site: landing (index.html), one
                         //   interactive page (app.html) that is BOTH the dev
-                        //   playground and the live post-processing demo. Imports
-                        //   the built package by name (dist), not the source.
+                        //   playground and the live post-processing demo, and the
+                        //   starters gallery (starters.html) whose templates are
+                        //   imported twice — as modules to run, and via ?raw to
+                        //   display. Imports the built package by name (dist).
+  templates/            //   the three runnable starter apps
 eslint.config.mjs
 tsconfig.json
 package.json
@@ -142,7 +160,13 @@ Rules that keep it lightweight and layered:
   logic of its own, only composition.
 - `modules/` may import only the public `lib/` surface — proving the module
   contract is sufficient, since built-ins get no private access.
-- exports map: `.` → the lib barrel, `./modules/*` → each module file.
+- every module is a folder with an `index.ts`; no loose files at the top of
+  `modules/`, so a module can grow internals without changing its import path.
+- exports map: `.` → the lib barrel, explicit `./modules/<name>` entries for the
+  folder indexes, then `./modules/*` for the deep files (`post/webgl/bloom`).
+  The specific entries must precede the wildcard.
+- each effect exists exactly once, and shared GLSL lives in one place — a pass
+  composes `shared/glsl.ts` rather than re-inlining a kernel.
 
 ## Tooling
 

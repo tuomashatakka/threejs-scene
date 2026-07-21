@@ -7,6 +7,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX } from '../shared/glsl.js'
+
 
 const ANAMORPHIC_SHADER = {
   uniforms: {
@@ -17,13 +19,7 @@ const ANAMORPHIC_SHADER = {
     uTint:       { value: new THREE.Color(0.3, 0.5, 1.0) },
     uResolution: { value: new THREE.Vector2(1, 1) },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uThreshold, uScale;

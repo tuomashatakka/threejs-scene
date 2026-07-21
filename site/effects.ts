@@ -39,7 +39,7 @@ import { createCinematicLUT } from '@tuomashatakka/threejs-scene/modules/post/ci
 import { outlineTargets, sunMesh } from './scene'
 
 import type { FrameContext, Size } from '@tuomashatakka/threejs-scene'
-import type { EffectContext } from '@tuomashatakka/threejs-scene/modules/postprocessing'
+import type { EffectContext } from '@tuomashatakka/threejs-scene/modules/post'
 import type { Pass } from '@tuomashatakka/threejs-scene/modules/post/webgl/types'
 
 
@@ -190,10 +190,10 @@ export function buildRegistry (ctx: EffectContext): Effect[] {
         P('vignette', 'vignette', 0, 1, 0.01, 0.35, (fx, v) => {
           uni(fx.pass!, 'uVignette').value = v
         }),
-        P('grain', 'grain', 0, 0.2, 0.005, 0.04, (fx, v) => {
+        P('grain', 'grain', 0, 0.2, 0.005, 0, (fx, v) => {
           uni(fx.pass!, 'uGrain').value = v
         }),
-        P('chromatic', 'chromatic', 0, 2, 0.01, 0.6, (fx, v) => {
+        P('chromatic', 'chromatic', 0, 2, 0.01, 0, (fx, v) => {
           uni(fx.pass!, 'uChromatic').value = v
         }),
       ],
@@ -278,13 +278,13 @@ export function buildRegistry (ctx: EffectContext): Effect[] {
       group:  'Blur & focus',
       make:   () => ({ pass: createRadialBlur() }),
       params: [
-        P('weight', 'weight', 0, 1, 0.01, 0.9, (fx, v) => {
+        P('weight', 'weight', 0, 1, 0.01, 1, (fx, v) => {
           uni(fx.pass!, 'uWeight').value = v
         }),
-        P('decay', 'decay', 0.8, 1, 0.001, 0.95, (fx, v) => {
+        P('decay', 'decay', 0.8, 1, 0.001, 0.92, (fx, v) => {
           uni(fx.pass!, 'uDecay').value = v
         }),
-        P('exposure', 'exposure', 0, 10, 0.1, 5, (fx, v) => {
+        P('exposure', 'exposure', 0, 3, 0.05, 1, (fx, v) => {
           uni(fx.pass!, 'uExposure').value = v
         }),
         P('count', 'samples', 8, 128, 1, 32, (fx, v) => {

@@ -10,6 +10,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX } from '../shared/glsl.js'
+
 
 const MOTION_BLUR_SHADER = {
   uniforms: {
@@ -20,13 +22,7 @@ const MOTION_BLUR_SHADER = {
     uIntensity:       { value: 1 },
     uSamples:         { value: 16 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform sampler2D tDepth;

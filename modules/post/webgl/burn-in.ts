@@ -8,6 +8,8 @@
 import * as THREE from 'three'
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js'
 
+import { FULLSCREEN_VERTEX } from '../shared/glsl.js'
+
 
 const BLEND_SHADER = new THREE.ShaderMaterial({
   uniforms: {
@@ -15,13 +17,7 @@ const BLEND_SHADER = new THREE.ShaderMaterial({
     tHistory: { value: null },
     uDecay:   { value: 0.92 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform sampler2D tHistory;
@@ -36,14 +32,8 @@ const BLEND_SHADER = new THREE.ShaderMaterial({
 })
 
 const COPY_SHADER = new THREE.ShaderMaterial({
-  uniforms:     { tDiffuse: { value: null }},
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  uniforms:       { tDiffuse: { value: null }},
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     varying vec2 vUv;

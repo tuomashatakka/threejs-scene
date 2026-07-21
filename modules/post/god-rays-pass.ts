@@ -22,6 +22,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX } from './shared/glsl.js'
+
 
 const GOD_RAYS_SHADER = {
   uniforms: {
@@ -34,30 +36,36 @@ const GOD_RAYS_SHADER = {
     uDensity:      { value: 0.9 },
     uWeight:       { value: 0.4 },
     uSamples:      { value: 60 },
+    uThreshold:    { value: 0.65 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform sampler2D tOcclusion;
     uniform bool uHasOcclusion;
     uniform vec2 uLightPos;
-    uniform float uExposure, uDecay, uDensity, uWeight;
+    uniform float uExposure, uDecay, uDensity, uWeight, uThreshold;
     uniform int uSamples;
     varying vec2 vUv;
 
-    // Verbatim algorithm from Erkaman/glsl-godrays: march from \`uv\` toward the
-    // screen-space light position, accumulating occlusion-texture samples with a
-    // decaying weight, then scale the sum by exposure. Returns the scatter term.
+    // Bright-pass: isolate the emitters. With no dedicated occlusion buffer the
+    // scene colour stands in as the occlusion source, and without this filter
+    // EVERY lit surface radiates shafts — the result reads as muddy haze rather
+    // than sun shafts. Soft-knee so highlights ramp in instead of popping.
+    vec3 brightPass (vec3 c, float threshold) {
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      float k = smoothstep(threshold, threshold + 0.25, l);
+      return c * k;
+    }
+
+    // Algorithm from Erkaman/glsl-godrays (GPU Gems 3 ch.13 / Mitchell): march
+    // from \`uv\` toward the screen-space light position, accumulating occlusion
+    // samples with a decaying weight, then scale the sum by exposure. Returns
+    // the scatter term.
     vec3 godrays (
         float density, float weight, float decay, float exposure,
-        int numSamples, sampler2D occlusionTexture,
-        vec2 screenSpaceLightPos, vec2 uv
+        int numSamples, sampler2D occlusionTexture, bool applyThreshold,
+        float threshold, vec2 screenSpaceLightPos, vec2 uv
     ) {
       vec3 fragColor = vec3(0.0, 0.0, 0.0);
       vec2 deltaTextCoord = vec2(uv - screenSpaceLightPos.xy);
@@ -66,11 +74,14 @@ const GOD_RAYS_SHADER = {
       float illuminationDecay = 1.0;
 
       // Fixed upper bound (WebGL can't loop a variable number of times); the
-      // inner test stops at numSamples. Matches the reference's 100-cap + break.
+      // inner test stops at numSamples. Note \`i >= numSamples\`, not the
+      // reference's \`numSamples < i\` — the latter runs numSamples + 1 steps
+      // while deltaTextCoord is normalised by 1/numSamples, marching past the light.
       for (int i = 0; i < 100; i++) {
-        if (numSamples < i) break;
+        if (i >= numSamples) break;
         textCoo -= deltaTextCoord;
         vec3 samp = texture2D(occlusionTexture, textCoo).xyz;
+        if (applyThreshold) samp = brightPass(samp, threshold);
         samp *= illuminationDecay * weight;
         fragColor += samp;
         illuminationDecay *= decay;
@@ -82,12 +93,12 @@ const GOD_RAYS_SHADER = {
 
     void main () {
       vec4 base = texture2D(tDiffuse, vUv);
-      // Branch on a uniform so the exact reference function (which takes one
-      // sampler) can run against either the dedicated occlusion buffer or the
-      // scene colour as a fallback occlusion source.
+      // Branch on a uniform so the one-sampler function can run against either
+      // the dedicated occlusion buffer (already masked — no threshold needed) or
+      // the scene colour as a fallback (bright-passed so only emitters radiate).
       vec3 rays = uHasOcclusion
-        ? godrays(uDensity, uWeight, uDecay, uExposure, uSamples, tOcclusion, uLightPos, vUv)
-        : godrays(uDensity, uWeight, uDecay, uExposure, uSamples, tDiffuse,   uLightPos, vUv);
+        ? godrays(uDensity, uWeight, uDecay, uExposure, uSamples, tOcclusion, false, uThreshold, uLightPos, vUv)
+        : godrays(uDensity, uWeight, uDecay, uExposure, uSamples, tDiffuse,   true,  uThreshold, uLightPos, vUv);
       gl_FragColor = vec4(base.rgb + rays, base.a);
     }
   `,
@@ -106,6 +117,18 @@ export interface GodRaysPass extends ShaderPass {
   setOcclusionTexture (texture: THREE.Texture | null): void
 }
 
+/** Options for {@link createGodRaysPass}. */
+export interface GodRaysOptions {
+
+  /**
+   * Luminance cutoff for the scene-colour fallback: only pixels brighter than
+   * this radiate shafts. Ignored when a dedicated occlusion buffer is bound.
+   * Lower it if the sun is dim, raise it if the whole scene hazes over.
+   * @defaultValue 0.65
+   */
+  threshold?: number
+}
+
 
 /**
  * Create a volumetric light-shaft pass using the GPU Gems 3 ch.13 radial-scattering algorithm (Mitchell light-shaft).
@@ -113,8 +136,9 @@ export interface GodRaysPass extends ShaderPass {
  * @returns A {@link GodRaysPass}. Call `updateFromLight(worldPos, camera)` each frame to project a world-space light onto the screen (disables the pass when the light is behind camera). Optionally bind a dedicated occlusion buffer via `setOcclusionTexture(texture)`.
  * @remarks The scatter term is purely additive (sceneColor + rays). Defaults to 60 samples; reduce for mobile. Falls back to sampling the scene colour as the occlusion source when no dedicated buffer is bound.
  */
-export function createGodRaysPass (): GodRaysPass {
-  const pass = new ShaderPass(GOD_RAYS_SHADER) as GodRaysPass
+export function createGodRaysPass (options: GodRaysOptions = {}): GodRaysPass {
+  const pass                      = new ShaderPass(GOD_RAYS_SHADER) as GodRaysPass
+  pass.uniforms.uThreshold!.value = options.threshold ?? 0.65
 
   pass.updateFromLight = (lightWorldPos, camera) => {
     projected.copy(lightWorldPos).project(camera);

@@ -10,6 +10,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX, GLSL_CHROMATIC, GLSL_VIGNETTE, GLSL_GRAIN } from './shared/glsl.js'
+
 
 /** Raw shader definition for the colour-grade pass: tint, contrast, saturation, vignette, seeded grain, and radial chromatic aberration operating in linear HDR space. */
 export const GradeShader = {
@@ -20,30 +22,26 @@ export const GradeShader = {
     uContrast:   { value: 1.05 },
     uSaturation: { value: 1.1 },
     uVignette:   { value: 0.35 },
-    uGrain:      { value: 0.04 },
-    uChromatic:  { value: 0.6 },
+    uGrain:      { value: 0 },
+    uChromatic:  { value: 0 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime, uContrast, uSaturation, uVignette, uGrain, uChromatic;
     uniform vec3 uTint;
     varying vec2 vUv;
-    float hash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    ${GLSL_CHROMATIC}
+    ${GLSL_VIGNETTE}
+    ${GLSL_GRAIN}
     void main () {
       vec2 center = vUv - 0.5;
-      // radial chromatic aberration: split grows toward the corners.
+      // Radial chromatic aberration: split grows toward the corners. Off by
+      // default — createChromaticAberration() is the dedicated pass; leaving it
+      // on here double-applied CA whenever both were enabled.
       float split = dot(center, center) * uChromatic * 0.02;
-      vec3 col;
-      col.r = texture2D(tDiffuse, vUv + center * split).r;
-      col.g = texture2D(tDiffuse, vUv).g;
-      col.b = texture2D(tDiffuse, vUv - center * split).b;
+      vec4 src = texture2D(tDiffuse, vUv);
+      vec3 col = uChromatic > 0.0 ? chromaticSample(tDiffuse, vUv, center * split) : src.rgb;
 
       // grade in linear HDR, before tone-mapping
       col *= uTint;
@@ -52,14 +50,12 @@ export const GradeShader = {
       col = mix(vec3(luma), col, uSaturation);
 
       // soft radial vignette
-      float vig = smoothstep(0.8, 0.2, length(center)) ;
-      col *= mix(1.0, vig, uVignette);
+      col *= vignette(vUv, uVignette);
 
-      // seeded grain
-      float g = (hash(vUv * 1024.0 + uTime) - 0.5) * uGrain;
-      col += g;
+      // seeded grain — off by default; createFilmGrainPass() is the dedicated pass
+      col += grain(vUv, uTime, uGrain);
 
-      gl_FragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(col, src.a);
     }
   `,
 }
@@ -88,18 +84,18 @@ export interface GradePass extends ShaderPass {
  * @param options.contrast - S-curve contrast pivot about mid-grey. Default `1.05`.
  * @param options.saturation - Colour saturation multiplier. Default `1.1`.
  * @param options.vignette - Soft radial vignette strength. Default `0.35`.
- * @param options.grain - Seeded grain amplitude. Default `0.04`.
- * @param options.chromatic - Radial chromatic-aberration strength that grows toward the corners. Default `0.6`.
+ * @param options.grain - Seeded grain amplitude. Default `0` — use {@link createFilmGrainPass} instead unless you specifically want grain applied pre-tone-map.
+ * @param options.chromatic - Radial chromatic-aberration strength that grows toward the corners. Default `0` — use `createChromaticAberration` instead.
  * @returns A {@link GradePass} whose `setTime(elapsed)` updates the grain seed each frame.
- * @remarks Must run in linear HDR (scene-referred) BEFORE the OutputPass tone-maps. Do NOT also set `renderer.toneMapping`.
+ * @remarks Must run in linear HDR (scene-referred) BEFORE the OutputPass tone-maps. Do NOT also set `renderer.toneMapping`. Grain and CA default to 0 so stacking this with the dedicated grain/CA passes does not double-apply either.
  */
 export function createGradePass ({
   tint = '#ffffff',
   contrast = 1.05,
   saturation = 1.1,
   vignette = 0.35,
-  grain = 0.04,
-  chromatic = 0.6,
+  grain = 0,
+  chromatic = 0,
 }: GradePassOptions = {}): GradePass {
   const pass                       = new ShaderPass(GradeShader) as GradePass
   pass.uniforms.uTint!.value       = new THREE.Color(tint)

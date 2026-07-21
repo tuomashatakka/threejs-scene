@@ -7,7 +7,6 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { SobelOperatorShader } from 'three/addons/shaders/SobelOperatorShader.js'
-import type { Pass } from 'three/addons/postprocessing/Pass.js'
 
 
 export interface SobelOptions {
@@ -15,10 +14,21 @@ export interface SobelOptions {
   height?: number
 }
 
-export function createSobel (options: SobelOptions = {}): Pass {
+export interface SobelPass extends ShaderPass {
+  setSize (width: number, height: number): void
+}
+
+export function createSobel (options: SobelOptions = {}): SobelPass {
+  // Default to the actual drawing-buffer size rather than (1, 1): the gradient
+  // kernel steps by 1/resolution, so a (1, 1) default makes the first frame
+  // sample a full screen away. Carrying setSize keeps it correct across resizes
+  // without the caller having to remember the onResize hook.
   const { width = 1, height = 1 } = options
-  const pass                      = new ShaderPass(SobelOperatorShader)
+  const pass                      = new ShaderPass(SobelOperatorShader) as SobelPass
   pass.uniforms.resolution!.value = new THREE.Vector2(width, height)
+  pass.setSize                    = (w, h) => {
+    (pass.uniforms.resolution!.value as THREE.Vector2).set(w, h)
+  }
   return pass
 }
 

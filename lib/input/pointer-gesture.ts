@@ -147,6 +147,7 @@ export function attachPointerGesture (
     el.removeEventListener('pointermove', onMove)
     el.removeEventListener('pointerup', onUp)
     el.removeEventListener('pointercancel', onUp)
+    el.removeEventListener('contextmenu', onSecondaryDown)
     el.removeEventListener('wheel', onWheel)
   }
 }

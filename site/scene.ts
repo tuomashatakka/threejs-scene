@@ -47,7 +47,7 @@ export function demoScene<S extends SceneState = SceneState> (): AppModule<S> {
       group.name  = 'sculpture'
 
       const knot = new THREE.Mesh(
-        new THREE.TorusKnotGeometry(1.6, 0.5, 220, 32),
+        new THREE.DodecahedronGeometry(1.6),
         new THREE.MeshStandardMaterial({ color: 0x9fb2ff, metalness: 0.6, roughness: 0.25, emissive: 0x1b2a6b, emissiveIntensity: 1.2 }),
       )
       knot.castShadow       = true

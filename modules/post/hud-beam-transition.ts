@@ -7,6 +7,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX, GLSL_HASH, GLSL_CHROMATIC } from './shared/glsl.js'
+
 
 const HUD_BEAM_SHADER = {
   uniforms: {
@@ -18,31 +20,23 @@ const HUD_BEAM_SHADER = {
     uNoiseAmp:  { value: 0.01 },
     uTime:      { value: 0 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uProgress, uBeamWidth, uFringe, uNoiseAmp, uTime;
     uniform vec3 uBeamColor;
     varying vec2 vUv;
-    float hash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    ${GLSL_HASH}
+    ${GLSL_CHROMATIC}
     void main () {
       float beamX = uProgress;
       float dist = vUv.x - beamX;
       float beam = exp(-pow(dist / uBeamWidth, 2.0));
       float reveal = step(0.0, -dist);
       float fringeOffset = beam * uFringe;
-      float noise = (hash(vUv * 256.0 + uTime) - 0.5) * uNoiseAmp * beam;
+      float noise = (hash21(vUv * 256.0 + uTime) - 0.5) * uNoiseAmp * beam;
       vec2 uv = vUv + vec2(noise, 0.0);
-      float r = texture2D(tDiffuse, uv + vec2(fringeOffset, 0.0)).r;
-      float g = texture2D(tDiffuse, uv).g;
-      float b = texture2D(tDiffuse, uv - vec2(fringeOffset, 0.0)).b;
-      vec3 base = vec3(r, g, b) * reveal;
+      vec3 base = chromaticSample(tDiffuse, uv, vec2(fringeOffset, 0.0)) * reveal;
       vec3 glow = uBeamColor * beam * 1.4;
       gl_FragColor = vec4(base + glow, 1.0);
     }

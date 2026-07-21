@@ -6,6 +6,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX } from '../shared/glsl.js'
+
 
 const RETRO_SHADER = {
   uniforms: {
@@ -15,13 +17,7 @@ const RETRO_SHADER = {
     uColorLevels:       { value: 8 },
     uScanlineIntensity: { value: 0.2 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform vec2 uResolution;

@@ -9,7 +9,7 @@
 import { createApp } from '@tuomashatakka/threejs-scene'
 import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
 import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
-import { postProcessing } from '@tuomashatakka/threejs-scene/modules/postprocessing'
+import { postProcessing } from '@tuomashatakka/threejs-scene/modules/post'
 
 import { demoScene } from './scene'
 import { buildRegistry, registryPasses, driveFrame, driveResize, createEffectsPanel } from './effects'

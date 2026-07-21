@@ -39,6 +39,9 @@ body[data-demo] {
   text-decoration: none;
 
   &:hover { border-color: var(--ink); text-decoration: none; }
+
+  /* the starters link stacks under the home link rather than overlapping it */
+  &[data-alt] { inset-block-start: calc(var(--space-md) + 2.5rem); }
 }
 
 /* — control panel — */

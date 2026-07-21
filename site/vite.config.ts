@@ -14,6 +14,8 @@ export default defineConfig({
 
   resolve: {
     alias: [
+      // folder-with-index modules resolve to their index.js (first match wins)
+      { find: /^@tuomashatakka\/threejs-scene\/modules\/(lighting|orbit|post|assets)$/, replacement: `${dist('modules/')}$1/index.js` },
       { find: /^@tuomashatakka\/threejs-scene\/modules\/(.*)$/, replacement: `${dist('modules/')}$1.js` },
       { find: '@tuomashatakka/threejs-scene', replacement: dist('lib/index.js') },
     ],
@@ -24,8 +26,9 @@ export default defineConfig({
     emptyOutDir:   true,
     rollupOptions: {
       input: {
-        index: fileURLToPath(new URL('./index.html', import.meta.url)),
-        app:   fileURLToPath(new URL('./app.html', import.meta.url)),
+        index:    fileURLToPath(new URL('./index.html', import.meta.url)),
+        app:      fileURLToPath(new URL('./app.html', import.meta.url)),
+        starters: fileURLToPath(new URL('./starters.html', import.meta.url)),
       },
     },
   },

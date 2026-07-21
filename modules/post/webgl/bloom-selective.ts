@@ -13,6 +13,8 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
+import { FULLSCREEN_VERTEX } from '../shared/glsl.js'
+
 import type { Disposable } from '../../../lib/index.js'
 import type { WebGlPassContext } from './types.js'
 
@@ -24,6 +26,12 @@ export interface SelectiveBloomOptions {
   strength?:  number
   radius?:    number
   threshold?: number
+
+  /**
+   * Gain applied to the bloom buffer when it is composited over the scene,
+   * independent of the blur's own `strength`. @defaultValue 1
+   */
+  compositeStrength?: number
 }
 
 export interface SelectiveBloomHandle extends Disposable {
@@ -36,14 +44,17 @@ export interface SelectiveBloomHandle extends Disposable {
   // Render the full selective-bloom result to screen. Call instead of renderer.render.
   render (): void
   setSize (width: number, height: number): void
+
+  /** Dial the composited glow without rebuilding the chain. */
+  setCompositeStrength (strength: number): void
 }
 
 export function createSelectiveBloom (
   ctx: WebGlPassContext,
   options: SelectiveBloomOptions = {},
 ): SelectiveBloomHandle {
-  const { renderer, scene, camera, width, height }    = ctx
-  const { strength = 1, radius = 0.4, threshold = 0 } = options
+  const { renderer, scene, camera, width, height }                           = ctx
+  const { strength = 1, radius = 0.4, threshold = 0, compositeStrength = 1 } = options
 
   const bloomLayer = new THREE.Layers()
   bloomLayer.set(BLOOM_LAYER)
@@ -62,26 +73,31 @@ export function createSelectiveBloom (
   const mixPass = new ShaderPass(
     new THREE.ShaderMaterial({
       uniforms: {
-        baseTexture:  { value: null },
-        bloomTexture: { value: bloomComposer.renderTarget2.texture },
+        baseTexture:    { value: null },
+        bloomTexture:   { value: bloomComposer.renderTarget2.texture },
+        uBloomStrength: { value: 1 },
       },
-      vertexShader: /* glsl */`
-        varying vec2 vUv;
-        void main () { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-      `,
+      vertexShader:   FULLSCREEN_VERTEX,
       fragmentShader: /* glsl */`
         uniform sampler2D baseTexture;
         uniform sampler2D bloomTexture;
+        uniform float uBloomStrength;
         varying vec2 vUv;
         void main () {
-          gl_FragColor = texture2D(baseTexture, vUv) + vec4(1.0) * texture2D(bloomTexture, vUv);
+          vec4 base = texture2D(baseTexture, vUv);
+          // Additive composite, scaled at composite time. (The old code multiplied
+          // by vec4(1.0) — a no-op with no way to dial the glow back.) Keep the
+          // base alpha so the chain stays composable.
+          vec3 bloom = texture2D(bloomTexture, vUv).rgb * uBloomStrength;
+          gl_FragColor = vec4(base.rgb + bloom, base.a);
         }
       `,
       defines: {},
     }),
     'baseTexture',
   )
-  mixPass.needsSwap = true
+  mixPass.needsSwap                      = true
+  mixPass.uniforms.uBloomStrength!.value = compositeStrength
 
   const finalComposer = new EffectComposer(renderer)
   finalComposer.addPass(new RenderPass(scene, camera))
@@ -131,6 +147,9 @@ export function createSelectiveBloom (
       bloomComposer.setSize(w, h)
       finalComposer.setSize(w, h)
       bloom.setSize(w, h)
+    },
+    setCompositeStrength (value) {
+      mixPass.uniforms.uBloomStrength!.value = value
     },
     dispose () {
       bloomComposer.dispose()

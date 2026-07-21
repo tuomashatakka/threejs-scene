@@ -5,6 +5,8 @@
 
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX, GLSL_HASH } from './shared/glsl.js'
+
 
 const FILM_GRAIN_SHADER = {
   uniforms: {
@@ -14,24 +16,18 @@ const FILM_GRAIN_SHADER = {
     uLuma:      { value: 0.5 },
     uDesat:     { value: 0.0 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime, uIntensity, uLuma, uDesat;
     varying vec2 vUv;
-    float hash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    ${GLSL_HASH}
     void main () {
       vec4 c = texture2D(tDiffuse, vUv);
       vec3 col = c.rgb;
-      float g = hash(vUv * 1024.0 + uTime);
+      float g = hash21(vUv * 1024.0 + uTime);
       vec3 grain = mix(
-        vec3(g, hash(vUv * 1024.0 + uTime + 1.0), hash(vUv * 1024.0 + uTime + 2.0)),
+        vec3(g, hash21(vUv * 1024.0 + uTime + 1.0), hash21(vUv * 1024.0 + uTime + 2.0)),
         vec3(g),
         uLuma
       );

@@ -8,6 +8,8 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
+import { FULLSCREEN_VERTEX, GLSL_HASH, GLSL_CHROMATIC } from '../shared/glsl.js'
+
 import type { FrameContext } from '../../../lib/index.js'
 
 
@@ -19,20 +21,13 @@ const CRT_SHADER = {
     uGlitch:    { value: 0.0 },
     uTime:      { value: 0 },
   },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main () {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+  vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uCurvature, uVignette, uGlitch, uTime;
     varying vec2 vUv;
-
-    float hash (float n) { return fract(sin(n) * 43758.5453); }
-
+    ${GLSL_HASH}
+    ${GLSL_CHROMATIC}
     void main () {
       // pincushion: displace toward the center by r^2
       vec2 centered = vUv * 2.0 - 1.0;
@@ -43,12 +38,9 @@ const CRT_SHADER = {
         return;
       }
       // glitch: rare horizontal band tear + rgb split
-      float band = step(1.0 - uGlitch * 0.02, hash(floor(uv.y * 48.0) + floor(uTime * 7.0)));
-      uv.x += band * (hash(uTime) - 0.5) * 0.08;
-      vec3 c;
-      c.r = texture2D(tDiffuse, uv + band * vec2(0.004, 0.0)).r;
-      c.g = texture2D(tDiffuse, uv).g;
-      c.b = texture2D(tDiffuse, uv - band * vec2(0.004, 0.0)).b;
+      float band = step(1.0 - uGlitch * 0.02, hash11(floor(uv.y * 48.0) + floor(uTime * 7.0)));
+      uv.x += band * (hash11(uTime) - 0.5) * 0.08;
+      vec3 c = chromaticSample(tDiffuse, uv, band * vec2(0.004, 0.0));
       // vignette from the warped radius
       float vig = 1.0 - uVignette * smoothstep(0.4, 1.4, dot(centered, centered));
       gl_FragColor = vec4(c * vig, 1.0);
