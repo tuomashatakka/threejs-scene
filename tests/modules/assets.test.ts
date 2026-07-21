@@ -6,8 +6,12 @@ import {
   markShared,
   ownsResource,
   createStandardMaterial,
+  createToonMaterial,
+  createGradientRamp,
+  MATERIAL_PRESETS,
   createGridTexture,
   createNoiseTexture,
+  createGradientTexture,
   crystalProp,
   rockProp,
   treeProp,
@@ -129,6 +133,41 @@ describe('materials', () => {
     expect(mat.metalness).toBe(0.5)
     mat.dispose()
   })
+
+  it('exposes every documented preset, and each one builds', () => {
+    const names = Object.keys(MATERIAL_PRESETS)
+    expect(names).toEqual(
+      expect.arrayContaining([ 'metal', 'chrome', 'gold', 'plastic', 'rubber', 'matte', 'emissive', 'glass' ]),
+    )
+
+    for (const name of names) {
+      const mat = createStandardMaterial(name as keyof typeof MATERIAL_PRESETS)
+      expect(mat).toBeInstanceOf(THREE.MeshStandardMaterial)
+      mat.dispose()
+    }
+  })
+
+  it('builds a toon material backed by a banded ramp', () => {
+    const toon = createToonMaterial({ color: '#ff7ad9', steps: 3 })
+    expect(toon).toBeInstanceOf(THREE.MeshToonMaterial)
+    // NearestFilter is what keeps the bands hard — linear would smear them back
+    // into a gradient and defeat the cel look
+    expect(toon.gradientMap?.magFilter).toBe(THREE.NearestFilter)
+    expect((toon.gradientMap as THREE.DataTexture | null)?.image.width).toBe(3)
+    toon.dispose()
+  })
+
+  it('quantises the toon ramp into the requested number of bands', () => {
+    const ramp = createGradientRamp(4)
+    expect(Array.from(ramp.image.data!)).toEqual([ 0, 85, 170, 255 ])
+    expect(ramp.generateMipmaps).toBe(false)
+    ramp.dispose()
+
+    // a ramp needs at least two stops to interpolate between
+    const degenerate = createGradientRamp(1)
+    expect(degenerate.image.width).toBe(2)
+    degenerate.dispose()
+  })
 })
 
 describe('textures', () => {
@@ -148,8 +187,20 @@ describe('textures', () => {
 
     expect(bytes(a)).toEqual(bytes(b))
     expect(bytes(a)).not.toEqual(bytes(c))
+
     for (const texture of [ a, b, c ])
       texture.dispose()
+  })
+
+  it('interpolates a gradient from the first stop to the last', () => {
+    const texture = createGradientTexture({ size: 8, from: '#000000', to: '#ffffff' })
+    const data    = texture.image.data!
+    const row     = (y: number) => data[y * 8 * 4]!
+
+    expect(row(0)).toBe(0) // v = 0 -> `from`
+    expect(row(7)).toBe(255) // v = 1 -> `to`
+    expect(row(4)).toBeGreaterThan(row(2))
+    texture.dispose()
   })
 })
 
