@@ -1,0 +1,149 @@
+// lib/input/pointer-gesture.ts
+// Unified pointer gesture layer. Drag, pinch, wheel, tap — works identically
+// on mouse, touch, pen, stylus. Always use this instead of mouse*/touch*
+// events.
+
+/**
+ * Unified pointer gesture callbacks. The same handlers fire for mouse, touch,
+ * and pen — always prefer this over discrete mouse/touch listeners.
+ */
+export interface PointerGestureCallbacks {
+  onDrag?:  (dx: number, dy: number, event: PointerEvent) => void
+  onPinch?: (deltaScale: number, centerX: number, centerY: number) => void
+  onTap?:   (x: number, y: number, event: PointerEvent) => void
+  onWheel?: (delta: number, event: WheelEvent) => void
+}
+
+/** Tap-detection tuning for {@link attachPointerGesture}. */
+export interface PointerGestureOptions {
+
+  /**
+   * Max press duration in milliseconds still counted as a tap.
+   * @defaultValue 250
+   */
+  tapThresholdMs?: number
+
+  /**
+   * Max pointer travel in CSS pixels still counted as a tap.
+   * @defaultValue 8
+   */
+  tapMovePx?: number
+}
+
+interface TrackedPointer {
+  x:     number
+  y:     number
+  lastX: number
+  lastY: number
+}
+
+/**
+ * Attach unified drag/pinch/tap/wheel gesture handling to an element.
+ *
+ * Single-pointer moves fire `onDrag` with per-move deltas in CSS pixels;
+ * two-pointer moves fire `onPinch` with the distance ratio to the previous
+ * move (>1 zoom in) plus the pinch center; a press released within the tap
+ * thresholds fires `onTap`; `onWheel` receives the raw `deltaY` and calls
+ * `preventDefault()` on the event.
+ *
+ * @param el - Element to listen on, typically the render canvas. Its
+ * `touch-action` style is set to `none` to disable native panning/zooming.
+ * @param callbacks - Gesture handlers; all optional.
+ * @param options - Tap detection thresholds; see {@link PointerGestureOptions}.
+ * @returns Detach function removing all listeners. The `touch-action` override
+ * is not restored.
+ */
+export function attachPointerGesture (
+  el: HTMLElement,
+  callbacks: PointerGestureCallbacks,
+  { tapThresholdMs = 250, tapMovePx = 8 }: PointerGestureOptions = {},
+): () => void {
+  const pointers = new Map<number, TrackedPointer>()
+  let lastPinchDist = 0
+  let downAt        = 0
+  let downX         = 0
+  let downY         = 0
+
+  // critical: disable native gesture handling on the canvas
+  el.style.touchAction = 'none'
+
+  const onDown = (e: PointerEvent): void => {
+    el.setPointerCapture(e.pointerId)
+    pointers.set(e.pointerId, {
+      x:     e.clientX,
+      y:     e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+    })
+    if (pointers.size === 1) {
+      downAt = performance.now()
+      downX = e.clientX
+      downY = e.clientY
+    }
+    else if (pointers.size === 2) {
+      const [ a, b ] = [ ...pointers.values() ]
+      if (a && b)
+        lastPinchDist = Math.hypot(a.x - b.x, a.y - b.y)
+    }
+  }
+
+  const onMove = (e: PointerEvent): void => {
+    const p = pointers.get(e.pointerId)
+    if (!p)
+      return
+    p.lastX = p.x; p.lastY = p.y
+    p.x                    = e.clientX; p.y = e.clientY
+
+    if (pointers.size === 1 && callbacks.onDrag)
+      callbacks.onDrag(p.x - p.lastX, p.y - p.lastY, e)
+    else if (pointers.size === 2 && callbacks.onPinch) {
+      const [ a, b ] = [ ...pointers.values() ]
+      if (!a || !b)
+        return
+
+      const dist    = Math.hypot(a.x - b.x, a.y - b.y)
+      const centerX = (a.x + b.x) / 2
+      const centerY = (a.y + b.y) / 2
+      if (lastPinchDist > 0)
+        callbacks.onPinch(dist / lastPinchDist, centerX, centerY)
+      lastPinchDist = dist
+    }
+  }
+
+  const onUp = (e: PointerEvent): void => {
+    const p = pointers.get(e.pointerId)
+    pointers.delete(e.pointerId)
+    if (pointers.size < 2)
+      lastPinchDist = 0
+
+    if (p && pointers.size === 0 && callbacks.onTap) {
+      const dt    = performance.now() - downAt
+      const moved = Math.hypot(p.x - downX, p.y - downY)
+      if (dt < tapThresholdMs && moved < tapMovePx)
+        callbacks.onTap(p.x, p.y, e)
+    }
+  }
+
+  const onWheel = (e: WheelEvent): void => {
+    if (callbacks.onWheel) {
+      e.preventDefault()
+      callbacks.onWheel(e.deltaY, e)
+    }
+  }
+
+  el.addEventListener('pointerdown', onDown)
+  el.addEventListener('pointermove', onMove)
+  el.addEventListener('pointerup', onUp)
+  el.addEventListener('pointercancel', onUp)
+  el.addEventListener('wheel', onWheel, { passive: false })
+
+  return () => {
+    el.removeEventListener('pointerdown', onDown)
+    el.removeEventListener('pointermove', onMove)
+    el.removeEventListener('pointerup', onUp)
+    el.removeEventListener('pointercancel', onUp)
+    el.removeEventListener('wheel', onWheel)
+  }
+}
+
+// perf: cheap. allocates one Map for active pointers; no per-frame work.

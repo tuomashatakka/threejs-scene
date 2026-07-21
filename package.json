@@ -1,0 +1,60 @@
+{
+  "name": "@tuomashatakka/threejs-scene",
+  "version": "0.1.0",
+  "description": "Lightweight imperative three.js app shell: createApp + a small module contract. Deterministic clock, seeded rng, unidirectional state flow, strict dispose chain.",
+  "type": "module",
+  "main": "./dist/lib/index.js",
+  "types": "./dist/lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/lib/index.js"
+    },
+    "./modules/*": {
+      "types": "./dist/modules/*.d.ts",
+      "import": "./dist/modules/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "readme.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "dev": "vite playground"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tuomashatakka/threejs-scene.git"
+  },
+  "keywords": [
+    "threejs",
+    "three",
+    "webgl",
+    "scene",
+    "app-shell",
+    "deterministic",
+    "frame-loop"
+  ],
+  "author": "Tuomas Hatakka",
+  "license": "ISC",
+  "peerDependencies": {
+    "three": ">=0.160.0"
+  },
+  "dependencies": {
+    "@tuomashatakka/canvas-loop-framecapper": "^1.0.0"
+  },
+  "devDependencies": {
+    "@tuomashatakka/eslint-config": "^4.0.1",
+    "@types/three": "^0.184.1",
+    "eslint": "^10.7.0",
+    "three": "^0.184.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}
