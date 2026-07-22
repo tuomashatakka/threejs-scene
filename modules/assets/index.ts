@@ -18,5 +18,5 @@ export { createGridTexture, createNoiseTexture, createGradientTexture } from './
 export type { GridTextureOptions, NoiseTextureOptions, GradientTextureOptions } from './textures'
 
 // props — a starter catalogue built on Prop
-export { crystalProp, rockProp, treeProp, lampPostProp } from './props'
-export type { PropOptions, CrystalOptions, RockOptions, TreeOptions, LampPostOptions } from './props'
+export { crystalProp, rockProp, treeProp, boatProp, cloudProp, lampPostProp } from './props'
+export type { PropOptions, CrystalOptions, RockOptions, TreeOptions, BoatOptions, CloudOptions, LampPostOptions } from './props'

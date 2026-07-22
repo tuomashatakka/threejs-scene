@@ -151,6 +151,93 @@ export function treeProp ({
   )
 }
 
+/** Options for {@link boatProp}. */
+export interface BoatOptions extends PropOptions {
+  hullColor?: THREE.ColorRepresentation
+  sailColor?: THREE.ColorRepresentation
+}
+
+/**
+ * A little low-poly sailing dinghy: a pinched hull, a mast, and one triangular
+ * sail. Long axis runs along +z, so point it downwind with `rotation.y`.
+ *
+ * @returns A {@link Prop} with parts `hull`, `mast`, and `sail`.
+ */
+export function boatProp ({ rng, scale = 1, hullColor = '#8a4436', sailColor = '#ece7d9' }: BoatOptions = {}): Prop {
+  const prop = new Prop('boat')
+
+  // Hull: a low box pinched toward a bow at +z and lifted at the prow, so it
+  // reads as a dinghy rather than a floating crate. BoxGeometry is indexed, so
+  // moving a shared corner moves it for every face — the shell stays closed.
+  const hullGeo = new THREE.BoxGeometry(0.42, 0.22, 0.96)
+  const hullPos = hullGeo.attributes.position as THREE.BufferAttribute
+  const vertex  = new THREE.Vector3()
+  for (let i = 0; i < hullPos.count; i++) {
+    vertex.fromBufferAttribute(hullPos, i)
+
+    const bow = Math.max(0, vertex.z / 0.48) // 0 amidships .. 1 at the bow
+    vertex.x *= 1 - 0.62 * bow // pinch the bow
+    if (vertex.y > 0)
+      vertex.y += 0.05 * bow // lift the prow
+    hullPos.setXYZ(i, vertex.x, vertex.y, vertex.z)
+  }
+  hullPos.needsUpdate = true
+  hullGeo.computeVertexNormals()
+
+  const hull      = new THREE.Mesh(hullGeo, createStandardMaterial('matte', { color: hullColor, flatShading: true }))
+  hull.position.y = 0.05
+  hull.castShadow = true
+
+  const mast = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.025, 0.6, 5),
+    createStandardMaterial('matte', { color: '#4a3728' }),
+  )
+  mast.position.set(0, 0.4, 0.03)
+  mast.castShadow = true
+
+  // A single triangular sail in the x = 0 plane, luffing up the mast and back.
+  const sailGeo = new THREE.BufferGeometry()
+  sailGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0.09, 0.05, 0, 0.67, 0.05, 0, 0.15, 0.42,
+  ], 3))
+  sailGeo.computeVertexNormals()
+
+  const sail      = new THREE.Mesh(sailGeo, createStandardMaterial('matte', { color: sailColor, flatShading: true, side: THREE.DoubleSide }))
+  sail.castShadow = true
+
+  prop.addPart('hull', hull).addPart('mast', mast)
+    .addPart('sail', sail)
+  return finish(prop, scale * (1 + jitter(rng, 0.12)))
+}
+
+/** Options for {@link cloudProp}. */
+export interface CloudOptions extends PropOptions {
+  color?: THREE.ColorRepresentation
+}
+
+/**
+ * A low-poly cloud: a clump of squashed, flat-shaded icosahedron puffs. Cheap
+ * and deliberately faceted — a handful drifting overhead reads as weather
+ * without a particle system.
+ *
+ * @returns A {@link Prop} whose parts are `puff0`, `puff1`, … in order.
+ */
+export function cloudProp ({ rng, scale = 1, color = '#eef1f6' }: CloudOptions = {}): Prop {
+  const prop     = new Prop('cloud')
+  // one material shared across the puffs — Prop.dispose dedupes it and frees it once
+  const material = createStandardMaterial('matte', { color, roughness: 1, flatShading: true })
+  const puffs    = 4 + Math.round(rng ? rng.range(0, 3) : 1)
+
+  for (let i = 0; i < puffs; i++) {
+    const radius = 0.6 + jitter(rng, 0.28)
+    const puff   = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 0), material)
+    puff.position.set((i - (puffs - 1) / 2) * 0.7 + jitter(rng, 0.18), jitter(rng, 0.16), jitter(rng, 0.5))
+    puff.scale.set(1, 0.62, 1) // squashed: clouds spread wider than they are tall
+    prop.addPart(`puff${i}`, puff)
+  }
+  return finish(prop, scale)
+}
+
 /** Options for {@link lampPostProp}. */
 export interface LampPostOptions extends PropOptions {
   lightColor?: THREE.ColorRepresentation

@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
+import { createSeededRng } from 'Δ/state/rng'
+
 import {
   Prop,
   markShared,
@@ -15,6 +17,8 @@ import {
   crystalProp,
   rockProp,
   treeProp,
+  boatProp,
+  cloudProp,
   lampPostProp,
 } from 'ꭍ/assets'
 
@@ -226,5 +230,31 @@ describe('prop catalogue', () => {
     const lamp = lampPostProp()
     expect(lamp.part('light')).toBeUndefined()
     lamp.dispose()
+  })
+
+  it('builds a boat with a hull, mast, and sail', () => {
+    const rng  = createSeededRng(3)
+    const boat = boatProp({ rng })
+
+    expect(boat.part('hull')).toBeDefined()
+    expect(boat.part('mast')).toBeDefined()
+    expect(boat.part('sail')).toBeDefined()
+    boat.dispose()
+  })
+
+  it('builds a cloud from several puffs sharing one material', () => {
+    const cloud = cloudProp({ rng: createSeededRng(7) })
+
+    expect(cloud.part('puff0')).toBeDefined()
+
+    // every puff draws from the same material instance
+    const materials = new Set<THREE.Material>()
+    cloud.traverse(object => {
+      const mesh = object as THREE.Mesh
+      if (mesh.material)
+        materials.add(mesh.material as THREE.Material)
+    })
+    expect(materials.size).toBe(1)
+    cloud.dispose()
   })
 })

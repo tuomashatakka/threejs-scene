@@ -1,11 +1,13 @@
 // Isometric tilt-shift endless scape
 // ----------------------------------
 // An orthographic iso rig over terrain that scrolls forever, pannable and
-// zoomable. The world is ONE InstancedMesh of 4,096 columns (one draw call); it
-// never grows, because the grid stays put in instance space and only its
-// heights are re-sampled as the view slides. Panning is therefore not a camera
-// move at all — it shifts the sample origin, which is why the map is endless in
-// every direction rather than just forward.
+// zoomable. The world is ONE merged, triangulated heightfield (a single
+// BufferGeometry, one draw call); it never grows, because the grid of quads
+// stays put and only its vertex heights are re-sampled as the view slides.
+// Panning is therefore not a camera move at all — it shifts the sample origin,
+// which is why the map is endless in every direction rather than just forward.
+// A flat water plane fills the lowlands, with boats sailing it and low-poly
+// clouds drifting overhead.
 //
 // Zoom is the interesting control: one number drives the frustum, the camera's
 // elevation, the fog band, and the tilt-shift blur at once. Zoom in and the rig
@@ -19,7 +21,7 @@ import { createApp, defineModule, createIsoCamera, resizeIsoCamera, aimIsoCamera
 import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
 import { postProcessing, FULLSCREEN_VERTEX } from '@tuomashatakka/threejs-scene/modules/post'
 import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
-import { createStandardMaterial, treeProp, rockProp } from '@tuomashatakka/threejs-scene/modules/assets'
+import { createStandardMaterial, treeProp, rockProp, boatProp, cloudProp } from '@tuomashatakka/threejs-scene/modules/assets'
 
 import type { App, AppModule } from '@tuomashatakka/threejs-scene'
 import type { Prop } from '@tuomashatakka/threejs-scene/modules/assets'
@@ -39,11 +41,32 @@ interface ScapeState {
   zoom: number
 }
 
-const GRID   = 64 // columns per side -> GRID² instances, still one draw call
-const CELL   = 0.96 // world units per column
-const HEIGHT = 5.2 // tallest column
-// low → high: deep water, shallows, grass, rock, snow
-const PALETTE   = [ '#24405e', '#3f7fa6', '#5f9e6a', '#8a8f7d', '#e8ebe6' ]
+const GRID   = 64 // cells per side -> GRID² quads, merged into ONE mesh, one draw call
+const CELL   = 0.96 // world units per cell
+const HEIGHT = 5.2 // tallest point
+
+// Water surface height and the basin floor the terrain is clamped to. Land is
+// anything standing above SEA; a single flat water plane sits at SEA and hides
+// the basin beneath it, so lowlands read as open water rather than blue ground.
+const SEA   = HEIGHT * 0.3
+const FLOOR = HEIGHT * 0.1
+
+// low → high tiers, keyed off SEA so the two water colours land below the
+// waterline and the ground colours above it: deep water, shallows, grass, rock, snow
+const PALETTE = [ '#22405e', '#356f96', '#5f9e6a', '#8a8f7d', '#e8ebe6' ]
+
+/** Palette tier for a raw (un-clamped) sample height. */
+function colorTier (raw: number): string {
+  if (raw < SEA * 0.62)
+    return PALETTE[0]! // deep water
+  if (raw < SEA)
+    return PALETTE[1]! // shallows
+  if (raw < HEIGHT * 0.56)
+    return PALETTE[2]! // grass
+  if (raw < HEIGHT * 0.8)
+    return PALETTE[3]! // rock
+  return PALETTE[4]! // snow
+}
 
 // The rig's yaw, in radians. Fixed, so the two ground-plane screen axes below
 // are constants rather than per-frame matrix reads.
@@ -243,20 +266,30 @@ function isoViewRig (tiltShift: TiltShiftPass): AppModule<ScapeState> {
   })
 }
 
-/** A scattered prop pinned to a world (noise) coordinate, so it rides the land. */
+/**
+ * A prop pinned to a world coordinate so it rides the world as the view slides.
+ * Trees and rocks stand on land; boats sail the water and clouds drift overhead,
+ * both carrying a slow world-space velocity and a phase for their bob.
+ */
 interface Dressing {
   prop: Prop
-
-  /** Trees only appear where the forest field is high; rocks stand anywhere on land. */
-  kind: 'tree' | 'rock'
+  kind: 'tree' | 'rock' | 'boat' | 'cloud'
   wx:   number
   wz:   number
+
+  /** World units per second; boats and clouds drift, trees and rocks don't. */
+  vx?: number
+  vz?: number
+
+  /** Bob/roll phase so a fleet or a sky-full doesn't move in lockstep. */
+  phase?: number
 }
 
-// Match the grass tier boundary (raw / HEIGHT ≥ 0.4): the two lowest palette
-// tiers are painted as water, so dressing may only stand at 0.4 and above or a
-// tree ends up planted mid-lake.
-const WATERLINE = HEIGHT * 0.4
+// Dressing stands on land — a little above the water plane so nothing wades in
+// at the shoreline. Boats want the opposite: clearly open water, well below SEA.
+const WATERLINE  = SEA + HEIGHT * 0.05
+const BOAT_WATER = SEA - HEIGHT * 0.06
+const CLOUD_Y    = HEIGHT * 2.6
 
 /**
  * Fold a prop's home coordinate into the GRID-wide box around the view centre.
@@ -268,40 +301,133 @@ function wrapAround (world: number, centre: number): number {
   return world + GRID * Math.round((centre - world) / GRID)
 }
 
-/** The endless terrain: one InstancedMesh, re-sampled as the world slides by. */
+/**
+ * A single flat water plane at SEA. Translucent, so the clamped basin darkens
+ * the deeps into water; large enough that its far edge dissolves into the fog
+ * instead of showing a seam. Static — the world scrolls past it, the water
+ * doesn't move — so nothing needs to touch it after build.
+ */
+function makeWaterPlane (): THREE.Mesh {
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(GRID * CELL * 3.2, GRID * CELL * 3.2),
+    createStandardMaterial('matte', { color: '#2f6188', roughness: 0.22, transparent: true, opacity: 0.82 }),
+  )
+  water.name          = 'water'
+  water.rotation.x    = -Math.PI / 2
+  water.position.y    = SEA
+  water.frustumCulled = false
+  water.renderOrder   = 1 // draw after the opaque terrain so it blends over the deeps
+  return water
+}
+
+/**
+ * The endless terrain: ONE merged, triangulated heightfield. It is a single
+ * BufferGeometry of GRID² quads, each split into two triangles and welded into
+ * one buffer — the same "collapse it all into one mesh, one draw call" idea the
+ * voxel greedy-mesher uses, but as a low-poly surface of triangles rather than
+ * cubes. Non-indexed and flat-shaded, so every triangle keeps its own crisp
+ * facet. As the view slides, the mesh shifts by the sub-cell remainder each
+ * frame and only re-samples its heights when the base cell crosses — it never
+ * grows, so the map is endless in every direction. A flat water plane sits at
+ * SEA: boats sail it and clouds drift above.
+ */
 function terrainScape (): AppModule<ScapeState> {
   const dressing: Dressing[] = []
+  const SIDE                 = GRID + 1
+  const rawH                 = new Float32Array(SIDE * SIDE)
+  const color                = new THREE.Color()
+
+  let geometry:  THREE.BufferGeometry | undefined
+  let terrain:   THREE.Mesh | undefined
   let lastBaseX = NaN
   let lastBaseZ = NaN
+
+  // Re-sample the world under (baseX, baseZ) and rewrite every vertex + colour.
+  // Heights are sampled once on the (GRID+1)² lattice and shared between the two
+  // triangles of each cell, so the surface is seamless.
+  function resample (baseX: number, baseZ: number): void {
+    if (!geometry)
+      return
+
+    const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute
+    const colAttr = geometry.getAttribute('color') as THREE.BufferAttribute
+    const pos     = posAttr.array as Float32Array
+    const col     = colAttr.array as Float32Array
+
+    for (let jj = 0; jj < SIDE; jj++)
+      for (let ii = 0; ii < SIDE; ii++)
+        rawH[jj * SIDE + ii] = terrainHeight(baseX + ii - GRID / 2, baseZ + jj - GRID / 2)
+
+    let p = 0
+    let c = 0
+    const put = (x: number, y: number, z: number): void => {
+      pos[p++] = x; pos[p++] = y; pos[p++] = z
+      col[c++]                             = color.r; col[c++] = color.g; col[c++] = color.b
+    }
+
+    for (let j = 0; j < GRID; j++)
+      for (let i = 0; i < GRID; i++) {
+        const r00 = rawH[j * SIDE + i]!
+        const r10 = rawH[j * SIDE + i + 1]!
+        const r01 = rawH[(j + 1) * SIDE + i]!
+        const r11 = rawH[(j + 1) * SIDE + i + 1]!
+        // clamp to the basin floor so the underwater dip stays shallow and tidy
+        const h00 = Math.max(r00, FLOOR)
+        const h10 = Math.max(r10, FLOOR)
+        const h01 = Math.max(r01, FLOOR)
+        const h11 = Math.max(r11, FLOOR)
+
+        const x0 = (i - GRID / 2) * CELL
+        const x1 = (i + 1 - GRID / 2) * CELL
+        const z0 = (j - GRID / 2) * CELL
+        const z1 = (j + 1 - GRID / 2) * CELL
+
+        // one flat colour per cell, from the mean of its four corner samples
+        color.set(colorTier((r00 + r10 + r01 + r11) * 0.25))
+        // two up-facing triangles (winding chosen so the face normals point +y)
+        put(x0, h00, z0); put(x1, h11, z1); put(x1, h10, z0)
+        put(x0, h00, z0); put(x0, h01, z1); put(x1, h11, z1)
+      }
+
+    posAttr.needsUpdate = true
+    colAttr.needsUpdate = true
+    // non-indexed, so this hands every triangle its own facet normal — the
+    // low-poly look, with no smoothing across cell edges
+    geometry.computeVertexNormals()
+  }
 
   return defineModule<ScapeState>({
     name: 'terrain-scape',
 
     build (ctx) {
-      const geometry = new THREE.BoxGeometry(CELL, 1, CELL)
-      // White base so per-instance colours come through at full saturation (the
-      // material colour multiplies the instance colour). Deliberately NOT
-      // `vertexColors: true` — that defines USE_COLOR, and the shader then
-      // multiplies by a `color` geometry attribute BoxGeometry doesn't have,
-      // which reads as black. setColorAt alone drives USE_INSTANCING_COLOR.
-      const material = createStandardMaterial('matte', { color: '#ffffff', flatShading: true })
-      const mesh     = new THREE.InstancedMesh(geometry, material, GRID * GRID)
+      // one merged buffer: GRID² quads × 2 triangles × 3 corners, unshared so
+      // each facet stays crisp; positions and colours are rewritten in place
+      geometry     = new THREE.BufferGeometry()
 
-      mesh.name          = 'terrain'
-      mesh.castShadow    = true
-      mesh.receiveShadow = true
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-      ctx.scene.add(mesh)
+      const verts  = GRID * GRID * 6
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts * 3), 3).setUsage(THREE.DynamicDrawUsage))
+      geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(verts * 3), 3).setUsage(THREE.DynamicDrawUsage))
 
-      // Scatter props so the scale reads. Each keeps a fixed home coordinate and
-      // is wrapped into view every frame, so it stays planted on its own patch
-      // of land however far the view pans. A wrapped prop that lands in water —
-      // or, for a tree, on open plains — hides itself, so both counts run high
-      // to keep a wooded stretch looking properly dense once the misses fall out.
+      // vertexColors is correct HERE (unlike the old InstancedMesh) because the
+      // geometry now carries a real `color` attribute for the shader to read.
+      const material     = createStandardMaterial('matte', { color: '#ffffff', vertexColors: true, flatShading: true })
+      terrain            = new THREE.Mesh(geometry, material)
+      terrain.name          = 'terrain'
+      terrain.castShadow    = true
+      terrain.receiveShadow = true
+      terrain.frustumCulled = false // verts move every cell-cross; skip stale-bounds culling
+      ctx.scene.add(terrain)
+      resample(0, 0)
+
+      ctx.scene.add(makeWaterPlane())
+
+      // Dressing: fixed home coordinates wrapped into view every frame, so each
+      // stays welded to its patch of world however far the view pans. Boats and
+      // clouds additionally carry a slow world-space drift (see update).
       const rng = ctx.rng.fork('dressing')
 
-      // Trees carry a spread of greens and heights so a stand doesn't read as
-      // one cloned conifer, and only light up over the forest field (see update).
+      // Trees carry a spread of greens and heights so a stand doesn't read as one
+      // cloned conifer, and only light up over the forest field (see update).
       for (let i = 0; i < 96; i++) {
         const canopy = new THREE.Color().setHSL(0.32 + rng.range(-0.04, 0.05), 0.42, rng.range(0.28, 0.4))
         const prop   = treeProp({ rng, scale: rng.range(0.7, 1.05), canopyColor: canopy })
@@ -309,18 +435,51 @@ function terrainScape (): AppModule<ScapeState> {
         ctx.scene.add(prop)
       }
 
-      // Boulders are sparser and stand anywhere on land, so the plains between
-      // the forests aren't bare.
+      // Boulders are sparser and stand anywhere on land.
       for (let i = 0; i < 22; i++) {
         const prop = rockProp({ rng, scale: rng.range(0.6, 1.0) })
         dressing.push({ prop, kind: 'rock', wx: rng.range(-GRID / 2, GRID / 2), wz: rng.range(-GRID / 2, GRID / 2) })
         ctx.scene.add(prop)
       }
+
+      // A small fleet, each on its own heading, shown only over open water — so a
+      // sail drifts past every now and then rather than a whole harbour at once.
+      for (let i = 0; i < 6; i++) {
+        const heading = rng.range(0, Math.PI * 2)
+        const speed   = rng.range(0.4, 0.8)
+        const prop    = boatProp({ rng, scale: rng.range(0.9, 1.2) })
+        dressing.push({
+          prop,
+          kind:  'boat',
+          wx:    rng.range(-GRID / 2, GRID / 2),
+          wz:    rng.range(-GRID / 2, GRID / 2),
+          vx:    Math.sin(heading) * speed,
+          vz:    Math.cos(heading) * speed,
+          phase: rng.range(0, Math.PI * 2),
+        })
+        ctx.scene.add(prop)
+      }
+
+      // Low-poly clouds drifting overhead, each on its own slow heading.
+      for (let i = 0; i < 8; i++) {
+        const heading = rng.range(0, Math.PI * 2)
+        const speed   = rng.range(0.15, 0.4)
+        const prop    = cloudProp({ rng, scale: rng.range(0.9, 1.7) })
+        dressing.push({
+          prop,
+          kind:  'cloud',
+          wx:    rng.range(-GRID / 2, GRID / 2),
+          wz:    rng.range(-GRID / 2, GRID / 2),
+          vx:    Math.sin(heading) * speed,
+          vz:    Math.cos(heading) * speed,
+          phase: rng.range(0, Math.PI * 2),
+        })
+        ctx.scene.add(prop)
+      }
     },
 
-    update (state, frame, ctx) {
-      const mesh = ctx.scene.getObjectByName('terrain') as THREE.InstancedMesh | undefined
-      if (!mesh)
+    update (state, frame, _ctx) {
+      if (!terrain)
         return
 
       // The view centre in grid space: the endless forward scroll plus the pan.
@@ -330,69 +489,63 @@ function terrainScape (): AppModule<ScapeState> {
       const baseZ   = Math.floor(offsetZ)
 
       // Slide the whole mesh by the sub-cell remainder every frame (free), and
-      // only rewrite the 4,096 instance matrices when we cross a cell boundary.
-      mesh.position.x = -(offsetX - baseX) * CELL
-      mesh.position.z = -(offsetZ - baseZ) * CELL
+      // only re-sample the heightfield when we cross a cell boundary.
+      terrain.position.x = -(offsetX - baseX) * CELL
+      terrain.position.z = -(offsetZ - baseZ) * CELL
 
       // Props live in world coordinates, so their screen slot is simply
       // (world − offset). That keeps a tree welded to its hilltop instead of
       // hovering in screen space while the land moves underneath it.
+      const dt = frame.delta
       for (const entry of dressing) {
-        const wx     = wrapAround(entry.wx, offsetX)
-        const wz     = wrapAround(entry.wz, offsetZ)
-        const height = terrainHeight(wx, wz)
+        // boats and clouds sail/drift through the world on their own heading
+        if (entry.vx !== undefined) {
+          entry.wx += entry.vx * dt
+          entry.wz += entry.vz! * dt
+        }
 
-        // On land at all, and — for trees — only where this patch is wooded, so
-        // forests bunch up and the plains between them stay open.
+        const wx = wrapAround(entry.wx, offsetX)
+        const wz = wrapAround(entry.wz, offsetZ)
+        const lx = (wx - offsetX) * CELL
+        const lz = (wz - offsetZ) * CELL
+
+        if (entry.kind === 'cloud') {
+          entry.prop.visible = true
+          entry.prop.position.set(lx, CLOUD_Y + Math.sin(frame.elapsed * 0.5 + entry.phase!) * 0.5, lz)
+          continue
+        }
+        if (entry.kind === 'boat') {
+          // only over clearly open water; bob and roll gently, bow pointing downwind
+          entry.prop.visible    = terrainHeight(wx, wz) < BOAT_WATER
+          entry.prop.rotation.y = Math.atan2(entry.vx!, entry.vz!)
+          entry.prop.rotation.z = Math.sin(frame.elapsed * 1.3 + entry.phase!) * 0.07
+          entry.prop.position.set(lx, SEA + Math.sin(frame.elapsed * 1.7 + entry.phase!) * 0.04, lz)
+          continue
+        }
+
+        // trees and rocks stand on the land surface; trees also need forest cover
+        const height       = terrainHeight(wx, wz)
         const onLand       = height >= WATERLINE
         entry.prop.visible = onLand && (entry.kind === 'rock' || forestDensity(wx, wz) >= FOREST_THRESHOLD)
-        entry.prop.position.set((wx - offsetX) * CELL, height, (wz - offsetZ) * CELL)
+        entry.prop.position.set(lx, height, lz)
       }
 
       if (lastBaseX === baseX && lastBaseZ === baseZ)
         return
       lastBaseX = baseX
       lastBaseZ = baseZ
-
-      const matrix = new THREE.Matrix4()
-      const color  = new THREE.Color()
-      let index  = 0
-
-      for (let j = 0; j < GRID; j++)
-        for (let i = 0; i < GRID; i++) {
-          // The grid SLOT is fixed; only the sample coordinate scrolls. Putting
-          // the base offset into the position instead would translate the whole
-          // slab away from a fixed camera — endless in principle, off-screen in
-          // seconds.
-          const slotX  = i - GRID / 2
-          const slotZ  = j - GRID / 2
-          const worldX = baseX + slotX
-          const worldZ = baseZ + slotZ
-          // flatten everything below the waterline into one flat sheet, so the
-          // lowlands read as water rather than as very short columns
-          const raw    = terrainHeight(worldX, worldZ)
-          const height = Math.max(raw, HEIGHT * 0.18)
-
-          matrix.makeScale(1, height, 1)
-          matrix.setPosition(slotX * CELL, height / 2, slotZ * CELL)
-          mesh.setMatrixAt(index, matrix)
-
-          const tier = Math.min(PALETTE.length - 1, Math.floor(raw / HEIGHT * PALETTE.length))
-          mesh.setColorAt(index, color.set(PALETTE[tier]!))
-          index++
-        }
-
-      mesh.instanceMatrix.needsUpdate = true
-      if (mesh.instanceColor)
-        mesh.instanceColor.needsUpdate = true
+      resample(baseX, baseZ)
     },
 
     dispose () {
-      // each Prop owns what it built; free them explicitly rather than relying
-      // on the scene-wide sweep
+      // props own what they built; free them explicitly. The terrain mesh, its
+      // geometry, and the water plane are plain scene objects and go with the
+      // scene-wide sweep.
       for (const entry of dressing)
         entry.prop.dispose()
       dressing.length = 0
+      geometry        = undefined
+      terrain         = undefined
       lastBaseX       = NaN
       lastBaseZ       = NaN
     },
@@ -480,6 +633,7 @@ export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
   return app
 }
 
-// perf: 1 draw call for the terrain (InstancedMesh) + one per dressing prop.
-// Instance matrices are rewritten only when the view crosses a cell boundary,
-// and the view rig re-derives the frustum only while the zoom is still moving.
+// perf: 1 draw call for the merged terrain heightfield + 1 for the water plane +
+// one per visible dressing prop (off-screen and gated props hide themselves).
+// Terrain vertices are rewritten only when the view crosses a cell boundary, and
+// the view rig re-derives the frustum only while the zoom is still moving.
