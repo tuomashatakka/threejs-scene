@@ -22,7 +22,7 @@
       <a class="btn primary" href="./app.html">Live demo</a>
       <a class="btn" href="./starters.html">Starter templates</a>
       <a class="btn" href="https://github.com/tuomashatakka/threejs-scene">View on GitHub</a>
-      <a class="btn" href="https://www.npmjs.com/package/@tuomashatakka/threejs-scene">npm</a>
+      <a class="btn" href="https://www.npmjs.com/package/threejs-scene">npm</a>
     </div>
   </header>
 
@@ -70,8 +70,8 @@
       rays, colour grade, DOF, CRT, glitch, chromatic aberration, and more) is
       ported from <code>threejs-scenes</code>.
     </p>
-    <pre><code>import { postProcessing } from '@tuomashatakka/threejs-scene/modules/post'
-import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
+    <pre><code>import { postProcessing } from 'threejs-scene/modules/post'
+import { createChromaticAberration } from 'threejs-scene/modules/post/webgl/ca'
 
 const app = createApp(canvas, {
   use: [
@@ -104,9 +104,9 @@ const app = createApp(canvas, {
 
   <section>
     <h2>Quickstart</h2>
-    <pre><code>import { createApp, defineModule } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
+    <pre><code>import { createApp, defineModule } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { orbitControls } from 'threejs-scene/modules/orbit'
 
 interface State { speed: number }
 
@@ -132,7 +132,7 @@ app.dispose()</code></pre>
   <section>
     <h2>Install</h2>
     <p class="muted">Peer-depends on <code>three &gt;=0.160.0</code>.</p>
-    <pre><code>npm i @tuomashatakka/threejs-scene three</code></pre>
+    <pre><code>npm i threejs-scene three</code></pre>
   </section>
 
   <footer>

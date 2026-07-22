@@ -7,7 +7,7 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
-import type { AppModule, SceneContext, Vec3 } from '../../lib/index'
+import type { AppModule, SceneContext, Vec3 } from '../../lib/index.js'
 
 
 /** Environment (IBL) tuning for {@link standardLighting}. */

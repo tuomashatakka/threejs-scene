@@ -17,7 +17,7 @@ import * as THREE from 'three'
 
 import { createComposer } from './composer.js'
 
-import type { AppModule, SceneContext, FrameContext, Size } from '../../lib/index'
+import type { AppModule, SceneContext, FrameContext, Size } from '../../lib/index.js'
 import type { ComposerHandle } from './composer.js'
 import type { WebGlPassContext, Resizable, Pass } from './webgl/types.js'
 
@@ -102,8 +102,8 @@ export interface PostProcessingOptions {
  * with the returned handle to restore the default `renderer.render`.
  * @typeParam S - Serializable app state shape (unused here, kept for `use: []` inference).
  * @example
- * import { postProcessing } from '@tuomashatakka/threejs-scene/modules/post'
- * import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
+ * import { postProcessing } from 'threejs-scene/modules/post'
+ * import { createChromaticAberration } from 'threejs-scene/modules/post/webgl/ca'
  *
  * const app = createApp(canvas, {
  *   use: [

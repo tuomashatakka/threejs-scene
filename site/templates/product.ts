@@ -13,14 +13,14 @@
 
 import * as THREE from 'three'
 
-import { createApp, defineModule, attachPointerGesture } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { postProcessing } from '@tuomashatakka/threejs-scene/modules/post'
-import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
-import { createGradePass } from '@tuomashatakka/threejs-scene/modules/post/grade-pass'
-import { Prop, createStandardMaterial } from '@tuomashatakka/threejs-scene/modules/assets'
+import { createApp, defineModule, attachPointerGesture } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { postProcessing } from 'threejs-scene/modules/post'
+import { createBloom } from 'threejs-scene/modules/post/webgl/bloom'
+import { createGradePass } from 'threejs-scene/modules/post/grade-pass'
+import { Prop, createStandardMaterial } from 'threejs-scene/modules/assets'
 
-import type { App, AppModule } from '@tuomashatakka/threejs-scene'
+import type { App, AppModule } from 'threejs-scene'
 
 
 interface ProductState {

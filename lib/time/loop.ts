@@ -8,7 +8,7 @@
 
 import { frameLoopManager } from '@tuomashatakka/canvas-loop-framecapper'
 
-import type { FrameCallback, FrameLoop } from '../types'
+import type { FrameCallback, FrameLoop } from '../types.js'
 
 
 /** Options for {@link createFrameLoop}. */

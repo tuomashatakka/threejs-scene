@@ -9,20 +9,20 @@
 
 import * as THREE from 'three'
 
-import { createClock } from '../time/clock'
-import { createFrameLoop } from '../time/loop'
-import { createStore } from '../state/store'
-import { createSeededRng } from '../state/rng'
-import { createRenderer } from '../render/renderer'
-import { attachResizeObserver } from '../render/resize'
-import { disposeScene } from '../lifecycle/dispose'
+import { createClock } from '../time/clock.js'
+import { createFrameLoop } from '../time/loop.js'
+import { createStore } from '../state/store.js'
+import { createSeededRng } from '../state/rng.js'
+import { createRenderer } from '../render/renderer.js'
+import { attachResizeObserver } from '../render/resize.js'
+import { disposeScene } from '../lifecycle/dispose.js'
 
-import type { Clock, ClockOptions } from '../time/clock'
-import type { Store, Reducer } from '../state/store'
-import type { RendererOptions } from '../render/renderer'
-import type { ResizeHandler } from '../render/resize'
-import type { AppModule, ModuleHandle } from './module'
-import type { Disposable, FrameContext, SceneContext, Vec3 } from '../types'
+import type { Clock, ClockOptions } from '../time/clock.js'
+import type { Store, Reducer } from '../state/store.js'
+import type { RendererOptions } from '../render/renderer.js'
+import type { ResizeHandler } from '../render/resize.js'
+import type { AppModule, ModuleHandle } from './module.js'
+import type { Disposable, FrameContext, SceneContext, Vec3 } from '../types.js'
 
 
 /**

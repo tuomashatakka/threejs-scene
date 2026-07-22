@@ -1,4 +1,4 @@
-# @tuomashatakka/threejs-scene — architecture plan
+# threejs-scene — architecture plan
 
 A ground-up rewrite of the `threejs-scenes` (v3) core, built incrementally in
 this repo. The API is **imperative** — `createApp` plus a small module
@@ -51,9 +51,9 @@ land later without breaking this surface.
 ## The interface
 
 ```ts
-import { createApp, defineModule } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
+import { createApp, defineModule } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { orbitControls } from 'threejs-scene/modules/orbit'
 
 const turbine = defineModule<State>({
   name: 'turbine',

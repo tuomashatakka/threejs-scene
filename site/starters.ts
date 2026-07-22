@@ -17,7 +17,7 @@ import isometricSource from './templates/isometric.ts?raw'
 import hovershipSource from './templates/hovership.ts?raw'
 import productSource from './templates/product.ts?raw'
 
-import type { App } from '@tuomashatakka/threejs-scene'
+import type { App } from 'threejs-scene'
 
 
 interface Starter {

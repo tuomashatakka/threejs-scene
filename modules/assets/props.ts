@@ -6,10 +6,10 @@
 
 import * as THREE from 'three'
 
-import { Prop } from './prop'
-import { createStandardMaterial } from './materials'
+import { Prop } from './prop.js'
+import { createStandardMaterial } from './materials.js'
 
-import type { SeededRng } from '../../lib/index'
+import type { SeededRng } from '../../lib/index.js'
 
 
 /** Shared options for the prop factories. */

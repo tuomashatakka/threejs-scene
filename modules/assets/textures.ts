@@ -6,7 +6,7 @@
 
 import * as THREE from 'three'
 
-import { mulberry32 } from '../../lib/index'
+import { mulberry32 } from '../../lib/index.js'
 
 
 /** Options shared by the procedural texture factories. */

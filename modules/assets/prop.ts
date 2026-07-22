@@ -7,9 +7,9 @@
 
 import * as THREE from 'three'
 
-import { disposeMaterial } from '../../lib/index'
+import { disposeMaterial } from '../../lib/index.js'
 
-import type { Disposable } from '../../lib/index'
+import type { Disposable } from '../../lib/index.js'
 
 
 /**

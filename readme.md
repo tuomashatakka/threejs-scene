@@ -1,4 +1,4 @@
-# @tuomashatakka/threejs-scene
+# threejs-scene
 
 ![screenshot](screenshot.png)
 
@@ -9,15 +9,15 @@ dispose chain. The successor core of `threejs-scenes` v3, rebuilt small.
 ## Install
 
 ```sh
-npm i @tuomashatakka/threejs-scene three
+npm i threejs-scene three
 ```
 
 ## Use
 
 ```ts
-import { createApp, defineModule } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
+import { createApp, defineModule } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { orbitControls } from 'threejs-scene/modules/orbit'
 
 interface State { speed: number }
 
@@ -52,8 +52,8 @@ drop it into `use: [ … ]` and it owns the frame draw through a module `render`
 hook (no composer wiring at the call site):
 
 ```ts
-import { postProcessing, createGradePass } from '@tuomashatakka/threejs-scene/modules/post'
-import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
+import { postProcessing, createGradePass } from 'threejs-scene/modules/post'
+import { createChromaticAberration } from 'threejs-scene/modules/post/webgl/ca'
 
 const app = createApp(canvas, {
   use: [
@@ -114,7 +114,7 @@ Each one is a worked example of tying a camera to something else in the scene:
 `modules/assets` is the content layer — plain factories rather than app modules:
 
 ```ts
-import { Prop, markShared, createStandardMaterial, treeProp } from '@tuomashatakka/threejs-scene/modules/assets'
+import { Prop, markShared, createStandardMaterial, treeProp } from 'threejs-scene/modules/assets'
 
 const ship = new Prop('ship')
   .addPart('hull', new THREE.Mesh(hullGeometry, createStandardMaterial('metal')))
@@ -141,7 +141,7 @@ Beyond the default perspective rig, `createApp({ camera })` accepts any prebuilt
 camera — including the two the library ships:
 
 ```ts
-import { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from '@tuomashatakka/threejs-scene'
+import { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from 'threejs-scene'
 
 const camera = createIsoCamera(aspect, { viewSize: 20, flavor: 'dimetric' })
 const rig    = createFollowCamera({ offset: [ 0, 2.6, -7.5 ] })
