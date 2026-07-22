@@ -61,32 +61,26 @@ nav[data-tabs] {
   }
 }
 
+/* The source pane floats over the stage as a [data-panel], so the split is no
+   longer a split — the preview gets the whole width and stays full-bleed
+   whether the source is open or shut. */
 main[data-split] {
-  display:               grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  flex:                  1;
-  min-height:            0;
-
-  /* stack on narrow viewports — the code pane is unreadable in a half-column */
-  @media (width < 60rem) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows:    minmax(14rem, 45dvh) minmax(0, 1fr);
-    overflow-y:            auto;
-  }
+  display:        flex;
+  flex-direction: column;
+  flex:           1;
+  min-height:     0;
 }
 
 section[data-preview] {
-  position:         relative;
-  display:          flex;
-  flex-direction:   column;
-  min-height:       0;
-  background:       var(--wash);
-  border-inline-end: 1px solid var(--line);
-
-  @media (width < 60rem) {
-    border-inline-end: none;
-    border-block-end:  1px solid var(--line);
-  }
+  position:        relative;
+  display:         flex;
+  flex-direction:  column;
+  /* fills the shell now that the source pane floats over it instead of taking
+     a column — without this the stage collapses and the renderer gets a 0-high
+     drawing buffer */
+  flex:            1;
+  min-height:      0;
+  background:      var(--wash);
 
   /* the stage is the renderer's sizing box — nothing else may live in it */
   & div[data-stage] {
@@ -119,11 +113,9 @@ section[data-preview] {
   }
 }
 
-section[data-source] {
-  display:        flex;
-  flex-direction: column;
-  min-height:     0;
-  background:     var(--paper);
+/* chrome (fixed, sliding, toggle) — including the width — comes from
+   [data-panel] in styles.css; only the code pane's own typography lives here */
+aside[data-source] {
 
   & > header {
     display:          flex;

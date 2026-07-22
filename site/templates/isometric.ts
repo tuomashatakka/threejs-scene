@@ -19,7 +19,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
 import { createApp, defineModule, createIsoCamera, resizeIsoCamera, aimIsoCamera, attachPointerGesture } from 'threejs-scene'
 import { standardLighting } from 'threejs-scene/modules/lighting'
-import { postProcessing, FULLSCREEN_VERTEX } from 'threejs-scene/modules/post'
+import { postProcessing, FULLSCREEN_VERTEX, createGradePass } from 'threejs-scene/modules/post'
 import { createBloom } from 'threejs-scene/modules/post/webgl/bloom'
 import { createStandardMaterial, treeProp, rockProp, boatProp, cloudProp } from 'threejs-scene/modules/assets'
 
@@ -562,6 +562,10 @@ export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
   // built here rather than inside `effects` so the view rig can rack its focus
   // band; postProcessing still owns it and disposes it
   const tiltShift = createTiltShiftPass()
+  const gradePass = createGradePass({
+    contrast: 1,
+    vignette: 0.6,
+  })
 
   const app = createApp<ScapeState>(canvas, {
     // Open fully zoomed in — the miniature "leaned-in" framing, tilted toward the
@@ -574,9 +578,10 @@ export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
       standardLighting({ sun: { position: [ 12, 18, 8 ], intensity: 2.6 }}),
       isoViewRig(tiltShift),
       terrainScape(),
+
       postProcessing<ScapeState>({
         bloom:   false,
-        effects: ctx => [ createBloom({ strength: 0.35, threshold: 0.7, width: ctx.width, height: ctx.height }), tiltShift ],
+        effects: ctx => [ gradePass, createBloom({ strength: 0, threshold: 0.98, width: ctx.width, height: ctx.height }), tiltShift ],
       }),
     ],
   })

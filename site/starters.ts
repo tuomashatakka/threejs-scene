@@ -17,6 +17,8 @@ import isometricSource from './templates/isometric.ts?raw'
 import hovershipSource from './templates/hovership.ts?raw'
 import productSource from './templates/product.ts?raw'
 
+import { attachCollapse } from './collapse'
+
 import type { App } from 'threejs-scene'
 
 
@@ -45,7 +47,7 @@ const STARTERS: Starter[] = [
   {
     id:     'hovership',
     title:  'Hovership racer',
-    blurb:  'Chase camera on a procedural circuit. Flat out on the straights, and the focus racks with the throttle.',
+    blurb:  'Chase camera on a procedural circuit, with a cockpit view a button away. Flat out on the straights, and the focus racks with the throttle.',
     file:   'templates/hovership.ts',
     source: hovershipSource,
     mount:  asStarterMount(mountHovership as never),
@@ -161,6 +163,18 @@ copyBtn?.addEventListener('click', async () => {
 // scene graph. Stripped from production builds by the import.meta.env guard.
 if (import.meta.env.DEV)
   Object.assign(window, { __starter: () => current })
+
+// The source pane collapses to a rail so the preview can have the full width —
+// worth having on a page whose left half is the actual subject.
+const sourcePane   = document.querySelector<HTMLElement>('[data-source]')
+const sourceToggle = document.querySelector<HTMLButtonElement>('[data-source] [data-collapse]')
+if (sourcePane && sourceToggle)
+  attachCollapse({
+    panel:      sourcePane,
+    button:     sourceToggle,
+    storageKey: 'threejs-scene:source-collapsed',
+    labels:     { open: 'Hide source', closed: 'Show source' },
+  })
 
 // deep-link support: /starters.html#hovership opens that template
 const requested = STARTERS.find(s => s.id === location.hash.slice(1))

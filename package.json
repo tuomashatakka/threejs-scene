@@ -1,6 +1,6 @@
 {
   "name": "threejs-scene",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lightweight imperative three.js app shell: createApp + a small module contract. Deterministic clock, seeded rng, unidirectional state flow, strict dispose chain.",
   "type": "module",
   "main": "./dist/lib/index.js",

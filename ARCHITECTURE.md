@@ -112,7 +112,7 @@ lib/
   camera/               // prebuilt rigs for createApp's `camera` option
     iso.ts              //   createIsoCamera / resizeIsoCamera / aimIsoCamera
                         //     (ortho true-iso|dimetric; frustum and pose move separately)
-    follow.ts           //   createFollowCamera: damped third-person chase rig
+    follow.ts           //   createFollowCamera: damped chase rig; aim() re-stations it
 
   lifecycle/            // teardown (observability lands here later)
     dispose.ts          //   recursive scene teardown

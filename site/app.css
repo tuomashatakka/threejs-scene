@@ -46,17 +46,8 @@ body[data-demo] {
 
 /* — control panel — */
 
+/* chrome (fixed, sliding, toggle) comes from [data-panel] in styles.css */
 aside[data-controls] {
-  position:        fixed;
-  inset-block:     0;
-  inset-inline-end: 0;
-  z-index:         3;
-  width:           min(22rem, 92vw);
-  display:         flex;
-  flex-direction:  column;
-  background:      color-mix(in oklch, var(--paper) 82%, transparent);
-  backdrop-filter: blur(0.75rem);
-  border-inline-start: 1px solid var(--line);
 
   & > header {
     display:          flex;

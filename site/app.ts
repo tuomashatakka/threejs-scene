@@ -11,6 +11,7 @@ import { standardLighting } from 'threejs-scene/modules/lighting'
 import { orbitControls } from 'threejs-scene/modules/orbit'
 import { postProcessing } from 'threejs-scene/modules/post'
 
+import { attachCollapse } from './collapse'
 import { demoScene } from './scene'
 import { buildRegistry, registryPasses, driveFrame, driveResize, createEffectsPanel } from './effects'
 
@@ -60,6 +61,21 @@ slider?.addEventListener('input', () => {
     label.textContent = Number(slider.value).toFixed(1)
 })
 
+// The panel is a convenience, not a requirement — the scene is the page.
+const controls       = document.querySelector<HTMLElement>('[data-controls]')
+const controlsToggle = document.querySelector<HTMLButtonElement>('[data-controls] [data-collapse]')
+const detachCollapse = controls && controlsToggle
+  ? attachCollapse({
+    panel:      controls,
+    button:     controlsToggle,
+    storageKey: 'threejs-scene:controls-collapsed',
+    labels:     { open: 'Hide controls', closed: 'Show controls' },
+  })
+  : null
+
 // HMR: full teardown through the dispose chain
 if (import.meta.hot)
-  import.meta.hot.dispose(() => app.dispose())
+  import.meta.hot.dispose(() => {
+    detachCollapse?.()
+    app.dispose()
+  })

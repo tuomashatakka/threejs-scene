@@ -3,7 +3,12 @@
 // A closed procedural circuit with real straights, a ship that drives itself —
 // hard on the throttle down the straights, braking early for the sweepers —
 // drag-to-steer that goes through app state (never straight into the
-// transform), and a damped chase camera.
+// transform), and a chase camera you can ride inside.
+//
+// The view button moves the camera between two stations — behind the ship, and
+// inside its canopy. Both are expressed in the ship's local space, so the
+// transition is a lerp of two presets through rig.aim() rather than a second
+// camera and a cut.
 //
 // The camera does the thing a real racing operator does: it racks focus. Under
 // acceleration the focal plane runs out to the horizon; under braking it snaps
@@ -21,6 +26,8 @@ import { createBloom } from 'threejs-scene/modules/post/webgl/bloom'
 import { createDof } from 'threejs-scene/modules/post/webgl/dof'
 import { Prop, createStandardMaterial } from 'threejs-scene/modules/assets'
 
+import ICARAS_PARTS from './icaras-parts.json'
+
 import type { App, AppModule, FollowCamera } from 'threejs-scene'
 import type { BokehPass } from 'three/addons/postprocessing/BokehPass.js'
 
@@ -35,6 +42,16 @@ interface RaceState {
 
   /** Target speed through the tightest corner on the circuit. */
   cornerSpeed: number
+}
+
+/** Which camera station the player asked for, and how far the rig has travelled there. */
+interface ViewState {
+
+  /** The requested station. Toggled by the button; the pilot eases toward it. */
+  cockpit: boolean
+
+  /** 0 = chase, 1 = cockpit. Owned by the pilot. */
+  blend: number
 }
 
 /** What the pilot publishes for other modules to read. The pilot is its only writer. */
@@ -74,6 +91,32 @@ const FOV_BASE = 55
 const FOV_KICK = 7 // degrees added at top speed
 
 const CURVATURE_SAMPLES = 240
+
+// The two camera stations, both in the ship's local space. Chase sits behind and
+// above, looking at a point over the hull; cockpit sits inside the canopy looking
+// straight down the nose. Everything between them is a lerp of these six numbers.
+const CHASE_OFFSET   = [ 0, 2.2, -6 ] as const
+const CHASE_LOOK     = [ 0, 1.2, 6 ] as const
+const COCKPIT_OFFSET = [ 0, 0.42, -0.05 ] as const
+const COCKPIT_LOOK   = [ 0, 0.42, 24 ] as const
+
+// Chase damping is what gives the third-person rig its weight, but it is not
+// free: exponential smoothing against a moving target settles a steady
+// speed × half-life / ln2 BEHIND where the offset asks for. Measured here that
+// was 6-9 extra units at racing speed — the offset below is set knowing it, and
+// the half-life is kept short enough that the gap does not swing wildly between
+// a corner and a straight. In the cockpit the same lag would trail the camera
+// clean out of the hull, so that station is rigid and the blend crossfades to it.
+const CHASE_DAMPING   = { position: 0.06, look: 0.08 }
+const COCKPIT_DAMPING = { position: 0, look: 0.05 }
+
+// Seconds to travel between stations. Long enough to read as a move rather than
+// a cut, short enough that you are not waiting to drive.
+const VIEW_TRANSITION = 0.9
+
+// From the cockpit the lens tightens: a narrower field is what makes a helmet
+// view feel enclosed, and it also stops the hull filling the frame edges.
+const FOV_COCKPIT = 42
 
 /**
  * A closed circuit with genuine straights. Runs of collinear control points are
@@ -200,41 +243,66 @@ function buildTrackGeometry (curve: THREE.CatmullRomCurve3, segments = 480): THR
   return geometry
 }
 
+// The Icaras hull, as authored: five parts sharing one four-slot material list,
+// addressed by geometry groups. The JSON carries positions, UVs, indices and the
+// group table — no loader, no network, and the mesh is identical every run.
+const ICARAS_MATERIALS = [ 'Body', 'Cockpit', 'Glass', 'Glow' ] as const
+
+// The model is authored nose-to-+z, which is already this template's direction
+// of travel — no flip. (The parts named engineL/engineR sit at +z and look like
+// they should be aft; they are not. Trust the authored orientation.)
+// Scale lives on an inner group rather than on the Prop itself because the pilot
+// writes ship.rotation/position every frame and would fight anything set there.
+const SHIP_SCALE = 1.45 // authored hull is ~1.7 long; this puts it at ~2.4
+
+function buildIcarasGeometry (part: typeof ICARAS_PARTS.parts.hull): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.pos, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(part.uv, 2))
+  geometry.setIndex(part.idx)
+
+  // One draw group per material slot — this is what lets five meshes share four
+  // materials instead of needing twenty.
+  for (const group of part.groups)
+    geometry.addGroup(group.start, group.count, ICARAS_MATERIALS.indexOf(group.mtl as never))
+
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 /** The player ship: a Prop, so one dispose() frees the whole assembly. */
 function buildShip (): Prop {
   const ship = new Prop('hovership')
 
-  const hull = new THREE.Mesh(
-    new THREE.ConeGeometry(0.55, 2.4, 6),
+  // Index order must match ICARAS_MATERIALS. The source model ships PBR maps for
+  // these; here they are rebuilt from the library's own presets, which keeps the
+  // starter free of binary assets and shows what modules/assets is for.
+  const materials = [
     createStandardMaterial('metal', { color: '#d9dee8', roughness: 0.28 }),
-  )
-  hull.rotation.x = Math.PI / 2 // tips the cone's +y nose onto +z, the direction of travel
-  hull.castShadow = true
-
-  const canopy = new THREE.Mesh(
-    new THREE.SphereGeometry(0.34, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    createStandardMaterial('metal', { color: '#2b303c', roughness: 0.55, metalness: 0.8 }),
     createStandardMaterial('glass', { color: '#8fd8ff', thickness: 0.2 }),
-  )
-  canopy.position.set(0, 0.24, 0.15)
-
-  const thruster = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.26, 0.34, 0.5, 12),
     createStandardMaterial('emissive', { emissive: '#ff8a3d', emissiveIntensity: 4 }),
-  )
-  thruster.rotation.x = Math.PI / 2
-  thruster.position.z = -1.25 // aft: the nose is +z
+  ]
 
-  const finMaterial = createStandardMaterial('plastic', { color: '#ff5d73', roughness: 0.5 })
-  for (const sign of [ -1, 1 ]) {
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.5), finMaterial)
-    fin.position.set(sign * 0.62, -0.05, -0.75)
-    fin.rotation.z = sign * 0.35
-    fin.castShadow = true
-    ship.addPart(sign < 0 ? 'finLeft' : 'finRight', fin)
+  const assembly = new THREE.Group()
+  assembly.scale.setScalar(SHIP_SCALE)
+
+  const hull      = new THREE.Mesh(buildIcarasGeometry(ICARAS_PARTS.parts.hull), materials)
+  hull.castShadow = true
+  assembly.add(hull)
+
+  // Nacelles and cannons hang off the hull at authored origins.
+  for (const name of [ 'engineL', 'engineR', 'weaponL', 'weaponR' ] as const) {
+    const part = ICARAS_PARTS.parts[name]
+    const mesh = new THREE.Mesh(buildIcarasGeometry(part), materials)
+    mesh.position.set(part.origin[0]!, part.origin[1]!, part.origin[2]!)
+    mesh.castShadow = true
+    hull.add(mesh)
   }
 
-  return ship.addPart('hull', hull).addPart('canopy', canopy)
-    .addPart('thruster', thruster)
+  // Every mesh is registered so the Prop's dispose chain reaches all five
+  // geometries and all four shared materials exactly once.
+  return ship.addPart('assembly', assembly)
 }
 
 function raceTrack (): AppModule<RaceState> {
@@ -298,11 +366,15 @@ function raceTrack (): AppModule<RaceState> {
  * is for what the player and the page can set. They reach the rest of the app
  * through `telemetry`, which this module is the only writer of.
  */
-function shipPilot (rig: FollowCamera, telemetry: Telemetry): AppModule<RaceState> {
+function shipPilot (rig: FollowCamera, telemetry: Telemetry, view: ViewState): AppModule<RaceState> {
   const point   = new THREE.Vector3()
   const tangent = new THREE.Vector3()
   const side    = new THREE.Vector3()
   const up      = new THREE.Vector3(0, 1, 0)
+
+  // Scratch for the camera-station lerp — reused so the toggle stays allocation-free.
+  const offset = [ 0, 0, 0 ] as [number, number, number]
+  const look   = [ 0, 0, 0 ] as [number, number, number]
 
   let ship: Prop | null = null
   let distance          = 0
@@ -362,12 +434,41 @@ function shipPilot (rig: FollowCamera, telemetry: Telemetry): AppModule<RaceStat
       const yaw = Math.atan2(tangent.x, tangent.z)
       ship.rotation.set(0, yaw, -state.steer * 0.4)
 
+      // Walk the blend toward whichever station the button last asked for, then
+      // ease it. Linear in, smoothstep out: the rig leaves and arrives gently
+      // while the middle of the move stays brisk.
+      const wants = view.cockpit ? 1 : 0
+      const step  = frame.delta / VIEW_TRANSITION
+      view.blend  = wants > view.blend
+        ? Math.min(wants, view.blend + step)
+        : Math.max(wants, view.blend - step)
+
+      const eased = view.blend * view.blend * (3 - 2 * view.blend)
+
+      // Re-aiming the rig IS the transition. Both stations are expressed in the
+      // ship's local space, so a lerp of the two carries the camera in through
+      // the canopy along the hull rather than swinging around it in world space,
+      // and the rig's own damping smooths whatever is left.
+      for (let i = 0; i < 3; i++) {
+        offset[i] = CHASE_OFFSET[i]! + (COCKPIT_OFFSET[i]! - CHASE_OFFSET[i]!) * eased
+        look[i]   = CHASE_LOOK[i]! + (COCKPIT_LOOK[i]! - CHASE_LOOK[i]!) * eased
+      }
+      rig.aim({
+        offset,
+        lookOffset:      look,
+        positionDamping: CHASE_DAMPING.position * (1 - eased) + COCKPIT_DAMPING.position * eased,
+        lookDamping:     CHASE_DAMPING.look * (1 - eased) + COCKPIT_DAMPING.look * eased,
+      })
+
       rig.update(ship.position, ship.quaternion, frame.delta)
 
       // Focal length rides the speed itself rather than the throttle: a wider
-      // lens flat out down a straight, back to normal in the slow corners.
+      // lens flat out down a straight, back to normal in the slow corners. The
+      // cockpit pulls the whole range tighter — a narrow lens is most of why a
+      // helmet view reads as enclosed.
       const pace   = (telemetry.speed - state.cornerSpeed) / Math.max(1, state.straightSpeed - state.cornerSpeed)
-      const wanted = FOV_BASE + Math.max(0, Math.min(1, pace)) * FOV_KICK
+      const open   = FOV_BASE + Math.max(0, Math.min(1, pace)) * FOV_KICK
+      const wanted = open + (FOV_COCKPIT - open) * eased
       if (Math.abs(wanted - fov) > 0.01) {
         fov              = wanted
         rig.camera.fov   = fov
@@ -426,9 +527,59 @@ function focusPuller (getPass: () => BokehPass | null, telemetry: Telemetry): Ap
   })
 }
 
+/**
+ * The view toggle. The template owns its own control rather than asking the page
+ * for one, so the starter is self-contained: drop `mount(canvas)` anywhere and
+ * the button comes with it.
+ */
+function attachViewToggle (canvas: HTMLCanvasElement, view: ViewState): () => void {
+  const button       = document.createElement('button')
+  button.type        = 'button'
+  button.className   = 'view-toggle'
+  button.textContent = 'Cockpit view'
+  // Bottom-LEFT on purpose: the pages that host these starters dock their side
+  // panel on the trailing edge, and a control that hides under it is no control.
+  button.style.cssText = [
+    'position:absolute', 'left:12px', 'bottom:12px', 'z-index:2',
+    'padding:8px 14px', 'border-radius:999px',
+    'border:1px solid rgba(121,247,255,.45)',
+    'background:rgba(10,10,20,.72)', 'color:#79f7ff',
+    'font:inherit', 'font-size:13px', 'cursor:pointer',
+    'backdrop-filter:blur(6px)',
+  ].join(';')
+
+  const onClick = (): void => {
+    view.cockpit       = !view.cockpit
+    button.textContent = view.cockpit ? 'Chase view' : 'Cockpit view'
+  }
+  button.addEventListener('click', onClick)
+
+  // The canvas' own parent is the positioning context; guard for a detached
+  // canvas so mount() stays safe to call before the element is in the document.
+  const host = canvas.parentElement
+  if (host) {
+    if (getComputedStyle(host).position === 'static')
+      host.style.position = 'relative'
+    host.appendChild(button)
+  }
+
+  return () => {
+    button.removeEventListener('click', onClick)
+    button.remove()
+  }
+}
+
 export function mount (canvas: HTMLCanvasElement): App<RaceState> {
-  const rig                  = createFollowCamera({ offset: [ 0, 2.6, -7.5 ], lookAhead: 1.2, fov: FOV_BASE })
+  const rig = createFollowCamera({
+    offset:          [ ...CHASE_OFFSET ],
+    lookOffset:      [ ...CHASE_LOOK ],
+    positionDamping: CHASE_DAMPING.position,
+    lookDamping:     CHASE_DAMPING.look,
+    fov:             FOV_BASE,
+    near:            0.05, // the cockpit station sits inches from the canopy glass
+  })
   const telemetry: Telemetry = { speed: 0, throttle: 0 }
+  const view: ViewState      = { cockpit: false, blend: 0 }
   let bokeh: BokehPass | null = null
 
   const app = createApp<RaceState>(canvas, {
@@ -443,7 +594,7 @@ export function mount (canvas: HTMLCanvasElement): App<RaceState> {
         hemi: { skyColor: '#9fc4ff', groundColor: '#141820', intensity: 0.35 },
       }),
       raceTrack(),
-      shipPilot(rig, telemetry),
+      shipPilot(rig, telemetry, view),
       focusPuller(() => bokeh, telemetry),
       postProcessing<RaceState>({
         bloom:   false,
@@ -466,9 +617,12 @@ export function mount (canvas: HTMLCanvasElement): App<RaceState> {
     },
   })
 
+  const detachToggle = attachViewToggle(canvas, view)
+
   const dispose = app.dispose
   app.dispose   = () => {
     detach()
+    detachToggle()
     bokeh = null
     dispose()
   }

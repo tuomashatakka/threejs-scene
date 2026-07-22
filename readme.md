@@ -153,7 +153,22 @@ aimIsoCamera(camera, { tilt: 22 })     // … and elevation is a pose change
 
 `createIsoCamera` builds a true-iso or dimetric orthographic rig;
 `createFollowCamera` is a damped third-person chase camera whose offset is
-expressed in the target's local space, so it banks and turns with it. Ortho
+expressed in the target's local space, so it banks and turns with it.
+
+`rig.aim(station)` re-aims a follow rig at runtime — seat, look point and both
+damping half-lives — which makes swapping between camera stations a lerp of the
+two presets rather than a second camera:
+
+```ts
+rig.aim({ offset: [ 0, 0.42, 0 ], lookOffset: [ 0, 0.42, 24 ], positionDamping: 0 })
+```
+
+`lookOffset` is in the target's local space, so it aims *down the target's nose*
+rather than at the target — that is what a cockpit view needs. Damping is part of
+a station on purpose: exponential smoothing settles roughly `speed × half-life`
+behind a moving target, which is the drift that gives a chase camera its weight
+and is exactly what you must not have when the camera is bolted inside the hull.
+Use `positionDamping: 0` for anything rigidly attached. Ortho
 frustums are not handled by the built-in resize (it only fixes perspective
 aspect) — call `resizeIsoCamera` from a module `resize` hook. `aimIsoCamera`
 re-aims a built rig at runtime, falling back to whatever pose it already has for

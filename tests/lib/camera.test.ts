@@ -122,4 +122,50 @@ describe('createFollowCamera', () => {
 
     expect(rig.camera.position.z).toBeCloseTo(94, 1)
   })
+
+  it('aims at a local look offset, so the look point turns with the target', () => {
+    const rig    = createFollowCamera({ offset: [ 0, 0, -6 ], lookOffset: [ 0, 0, 10 ]})
+    const turned = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+    rig.snap(at(0, 0, 0), turned)
+
+    // yawed 90°, "10 ahead" is +x — the camera must face that way, not down -z
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(rig.camera.quaternion)
+    expect(forward.x).toBeCloseTo(1)
+    expect(forward.z).toBeCloseTo(0)
+  })
+
+  it('re-aims to a new station without rebuilding the rig', () => {
+    const rig = createFollowCamera({ offset: [ 0, 2, -6 ]})
+    rig.snap(at(0, 0, 0), facingForward())
+
+    rig.aim({ offset: [ 0, 0.5, 1 ], positionDamping: 0 })
+    rig.update(at(0, 0, 0), facingForward(), 1 / 60)
+
+    // zero damping means the new station is reached in one frame
+    expect(rig.camera.position.y).toBeCloseTo(0.5)
+    expect(rig.camera.position.z).toBeCloseTo(1)
+  })
+
+  it('keeps a station field it was not given', () => {
+    const rig = createFollowCamera({ offset: [ 0, 2, -6 ], positionDamping: 0 })
+    rig.snap(at(0, 0, 0), facingForward())
+
+    rig.aim({ positionDamping: 0 }) // offset untouched
+    rig.update(at(0, 0, 0), facingForward(), 1 / 60)
+
+    expect(rig.camera.position.y).toBeCloseTo(2)
+    expect(rig.camera.position.z).toBeCloseTo(-6)
+  })
+
+  it('restores lookAhead aiming when the look offset is cleared', () => {
+    const rig = createFollowCamera({ offset: [ 0, 0, -6 ], lookOffset: [ 0, 0, 10 ], lookAhead: 3 })
+    rig.snap(at(0, 0, 0), facingForward())
+
+    rig.aim({ lookOffset: null })
+    rig.snap(at(0, 0, 0), facingForward())
+
+    // back to looking at target + worldUp*3, which from -6z tilts the camera up
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(rig.camera.quaternion)
+    expect(forward.y).toBeGreaterThan(0)
+  })
 })

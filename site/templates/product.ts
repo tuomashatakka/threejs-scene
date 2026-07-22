@@ -188,7 +188,7 @@ export function mount (canvas: HTMLCanvasElement): App<ProductState> {
     scene: { background: '#20232b' },
     use:   [
       standardLighting({
-        env:  { intensity: 1.15 }, // IBL — glass and chrome need this to read
+        env:  { intensity: 0.15 }, // IBL — glass and chrome need this to read
         sun:  { position: [ 5, 9, 4 ], intensity: 2.2, shadowMapSize: 2048, shadowFrustum: 8 },
         hemi: { skyColor: '#dce8ff', groundColor: '#2a2620', intensity: 0.5 },
       }),
@@ -198,8 +198,8 @@ export function mount (canvas: HTMLCanvasElement): App<ProductState> {
       postProcessing<ProductState>({
         bloom:   false,
         effects: ctx => [
-          createBloom({ strength: 0.22, threshold: 0.82, width: ctx.width, height: ctx.height }),
-          createGradePass({ contrast: 1.06, saturation: 1.04, vignette: 0.3 }),
+          createBloom({ strength: 0.05, threshold: 0.92, radius: 1.4, width: ctx.width, height: ctx.height }),
+          createGradePass({ contrast: 0.96, saturation: 0.84, vignette: 1.3 }),
         ],
       }),
     ],

@@ -256,3 +256,63 @@ footer {
   & a { color: var(--ink-faint); text-decoration: underline; }
   & a:hover { color: var(--ink); }
 }
+
+/* — side panel —
+   One pattern, both pages: a panel pinned to the trailing edge that slides out
+   of frame, with its toggle riding the leading edge so it stays reachable once
+   the panel has gone. Collapsing to zero width would take the control with it.
+
+   The panel floats OVER the stage rather than taking a column from it, so the
+   canvas is full-bleed in both states and nothing has to be re-laid-out (or
+   re-measured by the renderer) when it opens. */
+
+[data-panel] {
+  position:            fixed;
+  inset-block:         0;
+  inset-inline-end:    0;
+  z-index:             3;
+  width:               40rem;
+  max-width:           90vw;
+  display:             flex;
+  flex-direction:      column;
+  min-height:          0;
+  background:          color-mix(in oklch, var(--paper) 82%, transparent);
+  backdrop-filter:     blur(0.75rem);
+  border-inline-start: 1px solid var(--line);
+  transition:          translate var(--panel-speed, 0.35s) ease;
+}
+
+[data-panel][data-collapsed] { translate: 100% 0; }
+
+[data-panel] > button[data-collapse] {
+  position:            absolute;
+  inset-block-start:   var(--space-md);
+  inset-inline-start:  0;
+  translate:           -100% 0;
+  z-index:             1;
+  font:                inherit;
+  line-height:         1;
+  padding:             0.4em 0.6em;
+  cursor:              pointer;
+  color:               inherit;
+  background:          color-mix(in oklch, var(--paper) 82%, transparent);
+  backdrop-filter:     blur(0.75rem);
+  border:              1px solid var(--line);
+  border-inline-end:   0;
+  border-start-start-radius: 0.5em;
+  border-end-start-radius:   0.5em;
+  transition:          rotate var(--panel-speed, 0.35s) ease;
+
+  &:hover { background: var(--paper); }
+}
+
+[data-panel][data-collapsed] > button[data-collapse] { rotate: 180deg; }
+
+/* Restoring a remembered state must not animate — a panel closing itself in
+   front of you on load reads as a bug. */
+[data-panel][data-collapse-ready] { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-panel],
+  [data-panel] > button[data-collapse] { transition: none; }
+}
