@@ -14,14 +14,14 @@
 
 import * as THREE from 'three'
 
-import { createApp, defineModule, createFollowCamera, attachPointerGesture } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { postProcessing } from '@tuomashatakka/threejs-scene/modules/post'
-import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
-import { createDof } from '@tuomashatakka/threejs-scene/modules/post/webgl/dof'
-import { Prop, createStandardMaterial } from '@tuomashatakka/threejs-scene/modules/assets'
+import { createApp, defineModule, createFollowCamera, attachPointerGesture } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { postProcessing } from 'threejs-scene/modules/post'
+import { createBloom } from 'threejs-scene/modules/post/webgl/bloom'
+import { createDof } from 'threejs-scene/modules/post/webgl/dof'
+import { Prop, createStandardMaterial } from 'threejs-scene/modules/assets'
 
-import type { App, AppModule, FollowCamera } from '@tuomashatakka/threejs-scene'
+import type { App, AppModule, FollowCamera } from 'threejs-scene'
 import type { BokehPass } from 'three/addons/postprocessing/BokehPass.js'
 
 

@@ -1,5 +1,5 @@
 {
-  "name": "@tuomashatakka/threejs-scene",
+  "name": "threejs-scene",
   "version": "0.1.0",
   "description": "Lightweight imperative three.js app shell: createApp + a small module contract. Deterministic clock, seeded rng, unidirectional state flow, strict dispose chain.",
   "type": "module",
@@ -29,11 +29,13 @@
     "./modules/*": {
       "types": "./dist/modules/*.d.ts",
       "import": "./dist/modules/*.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "readme.md"
+    "readme.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
@@ -43,7 +45,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "dev": "npm run build && vite site"
+    "dev": "npm run build && vite site",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -74,5 +78,15 @@
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://tuomashatakka.github.io/threejs-scene/",
+  "bugs": {
+    "url": "https://github.com/tuomashatakka/threejs-scene/issues"
   }
 }

@@ -1,6 +1,6 @@
 // site/effects.ts
 // The post-processing effect registry + control-panel builder, powered by the
-// real library: every pass comes from a @tuomashatakka/threejs-scene/modules/post
+// real library: every pass comes from a threejs-scene/modules/post
 // factory (resolved to the built package), assembled through postProcessing()'s
 // `effects` hook. buildRegistry() instantiates the catalogue (guarded — a factory
 // that throws becomes a disabled row), driveFrame/driveResize feed the module's
@@ -8,39 +8,39 @@
 
 import * as THREE from 'three'
 
-import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
-import { createChromaticAberration } from '@tuomashatakka/threejs-scene/modules/post/webgl/ca'
-import { createAnamorphic } from '@tuomashatakka/threejs-scene/modules/post/webgl/anamorphic'
-import { createCrtPass } from '@tuomashatakka/threejs-scene/modules/post/webgl/crt'
-import { createRetroPass } from '@tuomashatakka/threejs-scene/modules/post/webgl/retro'
-import { createLensingPass } from '@tuomashatakka/threejs-scene/modules/post/webgl/lensing'
-import { createAfterimage } from '@tuomashatakka/threejs-scene/modules/post/webgl/afterimage'
-import { createSobel } from '@tuomashatakka/threejs-scene/modules/post/webgl/sobel'
-import { createRadialBlur } from '@tuomashatakka/threejs-scene/modules/post/webgl/radial-blur'
-import { createDof } from '@tuomashatakka/threejs-scene/modules/post/webgl/dof'
-import { createMotionBlur } from '@tuomashatakka/threejs-scene/modules/post/webgl/motion-blur'
-import { createFXAA } from '@tuomashatakka/threejs-scene/modules/post/webgl/fxaa'
-import { createSMAA } from '@tuomashatakka/threejs-scene/modules/post/webgl/smaa'
-import { createSsaa } from '@tuomashatakka/threejs-scene/modules/post/webgl/ssaa'
-import { createTraa } from '@tuomashatakka/threejs-scene/modules/post/webgl/traa'
-import { createAo } from '@tuomashatakka/threejs-scene/modules/post/webgl/ao'
-import { createOutline } from '@tuomashatakka/threejs-scene/modules/post/webgl/outline'
-import { createSsr } from '@tuomashatakka/threejs-scene/modules/post/webgl/ssr'
-import { createPixel } from '@tuomashatakka/threejs-scene/modules/post/webgl/pixel'
-import { createBurnInPass } from '@tuomashatakka/threejs-scene/modules/post/webgl/burn-in'
-import { createLUT } from '@tuomashatakka/threejs-scene/modules/post/webgl/lut'
-import { createLensflare } from '@tuomashatakka/threejs-scene/modules/post/webgl/lensflare'
-import { createGradePass } from '@tuomashatakka/threejs-scene/modules/post/grade-pass'
-import { createFilmGrainPass } from '@tuomashatakka/threejs-scene/modules/post/film-grain-pass'
-import { createGodRaysPass } from '@tuomashatakka/threejs-scene/modules/post/god-rays-pass'
-import { createRgbShiftPass, createBlockDisplacementPass, createScanCorruptionPass } from '@tuomashatakka/threejs-scene/modules/post/glitch-passes'
-import { createCinematicLUT } from '@tuomashatakka/threejs-scene/modules/post/cinematic-lut'
+import { createBloom } from 'threejs-scene/modules/post/webgl/bloom'
+import { createChromaticAberration } from 'threejs-scene/modules/post/webgl/ca'
+import { createAnamorphic } from 'threejs-scene/modules/post/webgl/anamorphic'
+import { createCrtPass } from 'threejs-scene/modules/post/webgl/crt'
+import { createRetroPass } from 'threejs-scene/modules/post/webgl/retro'
+import { createLensingPass } from 'threejs-scene/modules/post/webgl/lensing'
+import { createAfterimage } from 'threejs-scene/modules/post/webgl/afterimage'
+import { createSobel } from 'threejs-scene/modules/post/webgl/sobel'
+import { createRadialBlur } from 'threejs-scene/modules/post/webgl/radial-blur'
+import { createDof } from 'threejs-scene/modules/post/webgl/dof'
+import { createMotionBlur } from 'threejs-scene/modules/post/webgl/motion-blur'
+import { createFXAA } from 'threejs-scene/modules/post/webgl/fxaa'
+import { createSMAA } from 'threejs-scene/modules/post/webgl/smaa'
+import { createSsaa } from 'threejs-scene/modules/post/webgl/ssaa'
+import { createTraa } from 'threejs-scene/modules/post/webgl/traa'
+import { createAo } from 'threejs-scene/modules/post/webgl/ao'
+import { createOutline } from 'threejs-scene/modules/post/webgl/outline'
+import { createSsr } from 'threejs-scene/modules/post/webgl/ssr'
+import { createPixel } from 'threejs-scene/modules/post/webgl/pixel'
+import { createBurnInPass } from 'threejs-scene/modules/post/webgl/burn-in'
+import { createLUT } from 'threejs-scene/modules/post/webgl/lut'
+import { createLensflare } from 'threejs-scene/modules/post/webgl/lensflare'
+import { createGradePass } from 'threejs-scene/modules/post/grade-pass'
+import { createFilmGrainPass } from 'threejs-scene/modules/post/film-grain-pass'
+import { createGodRaysPass } from 'threejs-scene/modules/post/god-rays-pass'
+import { createRgbShiftPass, createBlockDisplacementPass, createScanCorruptionPass } from 'threejs-scene/modules/post/glitch-passes'
+import { createCinematicLUT } from 'threejs-scene/modules/post/cinematic-lut'
 
 import { outlineTargets, sunMesh } from './scene'
 
-import type { FrameContext, Size } from '@tuomashatakka/threejs-scene'
-import type { EffectContext } from '@tuomashatakka/threejs-scene/modules/post'
-import type { Pass } from '@tuomashatakka/threejs-scene/modules/post/webgl/types'
+import type { FrameContext, Size } from 'threejs-scene'
+import type { EffectContext } from 'threejs-scene/modules/post'
+import type { Pass } from 'threejs-scene/modules/post/webgl/types'
 
 
 interface Param {

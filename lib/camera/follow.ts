@@ -7,7 +7,7 @@
 
 import * as THREE from 'three'
 
-import type { Vec3 } from '../types'
+import type { Vec3 } from '../types.js'
 
 
 /** Options for {@link createFollowCamera}. */

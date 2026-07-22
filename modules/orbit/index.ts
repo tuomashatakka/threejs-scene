@@ -3,9 +3,9 @@
 // wheel to zoom. View-only camera manipulation, deliberately outside app
 // state (like scrolling a page). Uses only the public lib surface.
 
-import { attachPointerGesture } from '../../lib/index'
+import { attachPointerGesture } from '../../lib/index.js'
 
-import type { AppModule, Vec3 } from '../../lib/index'
+import type { AppModule, Vec3 } from '../../lib/index.js'
 
 
 /** Options for {@link orbitControls}. */

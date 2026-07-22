@@ -6,10 +6,10 @@
 // effect toggles/params and the speed slider drives app state. This is both the
 // `bun run dev` playground and the deployed demo.
 
-import { createApp } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
-import { postProcessing } from '@tuomashatakka/threejs-scene/modules/post'
+import { createApp } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { orbitControls } from 'threejs-scene/modules/orbit'
+import { postProcessing } from 'threejs-scene/modules/post'
 
 import { demoScene } from './scene'
 import { buildRegistry, registryPasses, driveFrame, driveResize, createEffectsPanel } from './effects'

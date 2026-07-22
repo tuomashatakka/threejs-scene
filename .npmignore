@@ -1,0 +1,23 @@
+# package.json "files" is the authoritative allowlist — this file is
+# defense-in-depth, and it still applies *inside* the included dist/.
+
+# root noise
+site/
+tests/
+node_modules/
+.github/
+.claude/
+screenshot.png
+ARCHITECTURE.md
+*.config.ts
+*.config.mjs
+tsconfig*.json
+bun.lock
+package-lock.json
+*.log
+.DS_Store
+
+# never ship build metadata or compiled tests from inside dist/
+*.tsbuildinfo
+**/*.test.js
+**/*.test.d.ts

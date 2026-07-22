@@ -10,9 +10,9 @@
 
 import * as THREE from 'three'
 
-import { defineModule } from '@tuomashatakka/threejs-scene'
+import { defineModule } from 'threejs-scene'
 
-import type { AppModule } from '@tuomashatakka/threejs-scene'
+import type { AppModule } from 'threejs-scene'
 
 
 export interface SceneState {

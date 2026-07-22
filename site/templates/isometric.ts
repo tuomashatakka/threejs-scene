@@ -15,15 +15,15 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
-import { createApp, defineModule, createIsoCamera, resizeIsoCamera, aimIsoCamera, attachPointerGesture } from '@tuomashatakka/threejs-scene'
-import { standardLighting } from '@tuomashatakka/threejs-scene/modules/lighting'
-import { postProcessing, FULLSCREEN_VERTEX } from '@tuomashatakka/threejs-scene/modules/post'
-import { createBloom } from '@tuomashatakka/threejs-scene/modules/post/webgl/bloom'
-import { createStandardMaterial, treeProp, rockProp } from '@tuomashatakka/threejs-scene/modules/assets'
+import { createApp, defineModule, createIsoCamera, resizeIsoCamera, aimIsoCamera, attachPointerGesture } from 'threejs-scene'
+import { standardLighting } from 'threejs-scene/modules/lighting'
+import { postProcessing, FULLSCREEN_VERTEX } from 'threejs-scene/modules/post'
+import { createBloom } from 'threejs-scene/modules/post/webgl/bloom'
+import { createStandardMaterial, treeProp, rockProp } from 'threejs-scene/modules/assets'
 
-import type { App, AppModule } from '@tuomashatakka/threejs-scene'
-import type { Prop } from '@tuomashatakka/threejs-scene/modules/assets'
-import type { Pass } from '@tuomashatakka/threejs-scene/modules/post/webgl/types'
+import type { App, AppModule } from 'threejs-scene'
+import type { Prop } from 'threejs-scene/modules/assets'
+import type { Pass } from 'threejs-scene/modules/post/webgl/types'
 
 
 interface ScapeState {

@@ -16,8 +16,8 @@
     "paths": {
       "Δ/*": ["./lib/*"],
       "ꭍ/*": ["./modules/*"],
-      "@tuomashatakka/threejs-scene": ["./lib/index.ts"],
-      "@tuomashatakka/threejs-scene/modules/*": ["./modules/*"]
+      "threejs-scene": ["./lib/index.ts"],
+      "threejs-scene/modules/*": ["./modules/*"]
     }
   },
   "include": ["lib", "modules", "site", "tests", "*.config.ts"],

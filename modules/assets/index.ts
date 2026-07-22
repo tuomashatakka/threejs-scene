@@ -7,16 +7,16 @@
 // canvases), so it builds identically in a headless test and in the browser.
 
 // the group-of-meshes primitive + its ownership rules
-export { Prop, markShared, ownsResource } from './prop'
+export { Prop, markShared, ownsResource } from './prop.js'
 
 // materials — tuned PBR presets, toon shading
-export { createStandardMaterial, createToonMaterial, createGradientRamp, MATERIAL_PRESETS } from './materials'
-export type { MaterialPreset, MaterialPresetParams, ToonMaterialOptions } from './materials'
+export { createStandardMaterial, createToonMaterial, createGradientRamp, MATERIAL_PRESETS } from './materials.js'
+export type { MaterialPreset, MaterialPresetParams, ToonMaterialOptions } from './materials.js'
 
 // textures — seeded, procedural, headless-safe
-export { createGridTexture, createNoiseTexture, createGradientTexture } from './textures'
-export type { GridTextureOptions, NoiseTextureOptions, GradientTextureOptions } from './textures'
+export { createGridTexture, createNoiseTexture, createGradientTexture } from './textures.js'
+export type { GridTextureOptions, NoiseTextureOptions, GradientTextureOptions } from './textures.js'
 
 // props — a starter catalogue built on Prop
-export { crystalProp, rockProp, treeProp, lampPostProp } from './props'
-export type { PropOptions, CrystalOptions, RockOptions, TreeOptions, LampPostOptions } from './props'
+export { crystalProp, rockProp, treeProp, lampPostProp } from './props.js'
+export type { PropOptions, CrystalOptions, RockOptions, TreeOptions, LampPostOptions } from './props.js'

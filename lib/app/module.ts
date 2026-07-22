@@ -4,7 +4,7 @@
 // current state onto them every simulation tick. Modules read state — they
 // never write it back.
 
-import type { FrameContext, SceneContext, Size } from '../types'
+import type { FrameContext, SceneContext, Size } from '../types.js'
 
 
 /**

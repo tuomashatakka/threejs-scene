@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@tuomashatakka/threejs-scene",
+      "name": "threejs-scene",
       "dependencies": {
         "@tuomashatakka/canvas-loop-framecapper": "^1.0.0",
       },

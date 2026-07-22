@@ -1,42 +1,42 @@
-// @tuomashatakka/threejs-scene — curated barrel.
+// threejs-scene — curated barrel.
 // Core factories + the shared type vocabulary, grouped by function:
 // app (composition root), time (clock, loop), state (store, rng), render
 // (renderer, resize), lifecycle (dispose), input (pointer-gesture). Behavior
 // modules live in the root modules/ directory and are imported via subpaths:
-//   import { orbitControls } from '@tuomashatakka/threejs-scene/modules/orbit'
+//   import { orbitControls } from 'threejs-scene/modules/orbit'
 
-export * from './types'
+export * from './types.js'
 
 // app — the composition root
-export { createApp } from './app/create-app'
-export { defineModule } from './app/module'
-export type { App, AppOptions, AppCameraOptions, AppSceneOptions, AppLoopOptions } from './app/create-app'
-export type { AppModule, ModuleHandle } from './app/module'
+export { createApp } from './app/create-app.js'
+export { defineModule } from './app/module.js'
+export type { App, AppOptions, AppCameraOptions, AppSceneOptions, AppLoopOptions } from './app/create-app.js'
+export type { AppModule, ModuleHandle } from './app/module.js'
 
 // time — when things happen
-export { createClock } from './time/clock'
-export { createFrameLoop } from './time/loop'
-export type { Clock, ClockMode, ClockOptions } from './time/clock'
-export type { FrameLoopOptions } from './time/loop'
+export { createClock } from './time/clock.js'
+export { createFrameLoop } from './time/loop.js'
+export type { Clock, ClockMode, ClockOptions } from './time/clock.js'
+export type { FrameLoopOptions } from './time/loop.js'
 
 // state — what the world is
-export { createStore } from './state/store'
-export { createSeededRng, mulberry32 } from './state/rng'
-export type { Store, Reducer, StoreListener } from './state/store'
+export { createStore } from './state/store.js'
+export { createSeededRng, mulberry32 } from './state/rng.js'
+export type { Store, Reducer, StoreListener } from './state/store.js'
 
 // camera — prebuilt rigs for createApp's `camera` option
-export { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from './camera/index'
-export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions } from './camera/index'
+export { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from './camera/index.js'
+export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions } from './camera/index.js'
 
 // render — how it reaches the screen
-export { createRenderer } from './render/renderer'
-export { attachResizeObserver } from './render/resize'
-export type { RendererOptions } from './render/renderer'
-export type { ResizeHandler } from './render/resize'
+export { createRenderer } from './render/renderer.js'
+export { attachResizeObserver } from './render/resize.js'
+export type { RendererOptions } from './render/renderer.js'
+export type { ResizeHandler } from './render/resize.js'
 
 // lifecycle — teardown
-export { disposeScene, disposeMaterial } from './lifecycle/dispose'
+export { disposeScene, disposeMaterial } from './lifecycle/dispose.js'
 
 // input — how intent enters the system
-export { attachPointerGesture } from './input/pointer-gesture'
-export type { PointerGestureCallbacks, PointerGestureOptions } from './input/pointer-gesture'
+export { attachPointerGesture } from './input/pointer-gesture.js'
+export type { PointerGestureCallbacks, PointerGestureOptions } from './input/pointer-gesture.js'
