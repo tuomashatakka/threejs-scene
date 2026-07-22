@@ -10,10 +10,12 @@
 // cannot reliably hand out another, so reusing the element leaks or blanks.
 
 import { mount as mountIsometric } from './templates/isometric'
+import { mount as mountIsometricSqr } from './templates/isometric-sqr'
 import { mount as mountHovership } from './templates/hovership'
 import { mount as mountProduct } from './templates/product'
 
 import isometricSource from './templates/isometric.ts?raw'
+import isometricSqrSource from './templates/isometric-sqr.ts?raw'
 import hovershipSource from './templates/hovership.ts?raw'
 import productSource from './templates/product.ts?raw'
 
@@ -43,6 +45,14 @@ const STARTERS: Starter[] = [
     file:   'templates/isometric.ts',
     source: isometricSource,
     mount:  asStarterMount(mountIsometric as never),
+  },
+  {
+    id:     'isometric-sqr',
+    title:  'Isometric Square Scape',
+    blurb:  'Pannable, zoomable tilt-shift over endless terrain. Zoom in and the rig tilts up as the bokeh thickens.',
+    file:   'templates/isometric-sqr.ts',
+    source: isometricSqrSource,
+    mount:  asStarterMount(mountIsometricSqr as never),
   },
   {
     id:     'hovership',
