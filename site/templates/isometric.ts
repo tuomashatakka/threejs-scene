@@ -49,11 +49,14 @@ const PALETTE   = [ '#24405e', '#3f7fa6', '#5f9e6a', '#8a8f7d', '#e8ebe6' ]
 // are constants rather than per-frame matrix reads.
 const YAW = Math.PI / 4
 // Screen-right and screen-up projected onto the ground, for an iso camera at
-// YAW looking at the origin. Derived from three's lookAt basis: x = ẑ × up.
+// YAW looking at the origin. Derived from three's lookAt basis: screen-right is
+// x = ẑ × up; screen-up is the ground component of ŷ = ẑ × x, which points
+// AWAY from the camera — the negative of (cos YAW, sin YAW). Getting this sign
+// wrong sent every vertical pan the wrong way while horizontal stayed correct.
 const RIGHT_X = Math.sin(YAW)
 const RIGHT_Z = -Math.cos(YAW)
-const UP_X    = Math.cos(YAW)
-const UP_Z    = Math.sin(YAW)
+const UP_X    = -Math.cos(YAW)
+const UP_Z    = -Math.sin(YAW)
 
 const VIEW_SIZE = 20 // vertical world span at zoom 1
 const ZOOM_MIN  = 0.7 // any wider and the frame outruns the grid, showing the slab edge
@@ -115,6 +118,20 @@ function terrainHeight (x: number, z: number): number {
   const n     = (broad + mid + fine) / 1.56
   // gentle gamma keeps lowlands flat (they read as water) without crushing peaks
   return Math.pow(n, 1.35) * HEIGHT
+}
+
+// A second, slower noise field that has nothing to do with elevation: it decides
+// which stretches of land are wooded. Low frequency so the boundaries are broad —
+// the auto-scroll carries the view through a dense forest, then out into open
+// plains, then back — and offset off the terrain lattice so tree cover never
+// simply traces the hills. Land above the threshold reads as forest; below it,
+// plains. Sampled per world coordinate, so a stand of trees stays welded to its
+// patch of ground exactly like the heights do.
+const FOREST_FREQ      = 0.055
+const FOREST_THRESHOLD = 0.52
+
+function forestDensity (x: number, z: number): number {
+  return valueNoise(x * FOREST_FREQ + 41.7, z * FOREST_FREQ - 17.3)
 }
 
 /** A tilt-shift pass whose focus band can be racked from outside. */
@@ -229,11 +246,17 @@ function isoViewRig (tiltShift: TiltShiftPass): AppModule<ScapeState> {
 /** A scattered prop pinned to a world (noise) coordinate, so it rides the land. */
 interface Dressing {
   prop: Prop
+
+  /** Trees only appear where the forest field is high; rocks stand anywhere on land. */
+  kind: 'tree' | 'rock'
   wx:   number
   wz:   number
 }
 
-const WATERLINE = HEIGHT * 0.24
+// Match the grass tier boundary (raw / HEIGHT ≥ 0.4): the two lowest palette
+// tiers are painted as water, so dressing may only stand at 0.4 and above or a
+// tree ends up planted mid-lake.
+const WATERLINE = HEIGHT * 0.4
 
 /**
  * Fold a prop's home coordinate into the GRID-wide box around the view centre.
@@ -272,12 +295,25 @@ function terrainScape (): AppModule<ScapeState> {
 
       // Scatter props so the scale reads. Each keeps a fixed home coordinate and
       // is wrapped into view every frame, so it stays planted on its own patch
-      // of land however far the view pans. Generous count: a wrapped prop that
-      // lands in water hides itself, and roughly a third of the map is water.
+      // of land however far the view pans. A wrapped prop that lands in water —
+      // or, for a tree, on open plains — hides itself, so both counts run high
+      // to keep a wooded stretch looking properly dense once the misses fall out.
       const rng = ctx.rng.fork('dressing')
-      for (let i = 0; i < 34; i++) {
-        const prop = i % 4 === 0 ? rockProp({ rng, scale: 0.8 }) : treeProp({ rng, scale: 0.85 })
-        dressing.push({ prop, wx: rng.range(-GRID / 2, GRID / 2), wz: rng.range(-GRID / 2, GRID / 2) })
+
+      // Trees carry a spread of greens and heights so a stand doesn't read as
+      // one cloned conifer, and only light up over the forest field (see update).
+      for (let i = 0; i < 96; i++) {
+        const canopy = new THREE.Color().setHSL(0.32 + rng.range(-0.04, 0.05), 0.42, rng.range(0.28, 0.4))
+        const prop   = treeProp({ rng, scale: rng.range(0.7, 1.05), canopyColor: canopy })
+        dressing.push({ prop, kind: 'tree', wx: rng.range(-GRID / 2, GRID / 2), wz: rng.range(-GRID / 2, GRID / 2) })
+        ctx.scene.add(prop)
+      }
+
+      // Boulders are sparser and stand anywhere on land, so the plains between
+      // the forests aren't bare.
+      for (let i = 0; i < 22; i++) {
+        const prop = rockProp({ rng, scale: rng.range(0.6, 1.0) })
+        dressing.push({ prop, kind: 'rock', wx: rng.range(-GRID / 2, GRID / 2), wz: rng.range(-GRID / 2, GRID / 2) })
         ctx.scene.add(prop)
       }
     },
@@ -306,7 +342,10 @@ function terrainScape (): AppModule<ScapeState> {
         const wz     = wrapAround(entry.wz, offsetZ)
         const height = terrainHeight(wx, wz)
 
-        entry.prop.visible = height >= WATERLINE
+        // On land at all, and — for trees — only where this patch is wooded, so
+        // forests bunch up and the plains between them stay open.
+        const onLand       = height >= WATERLINE
+        entry.prop.visible = onLand && (entry.kind === 'rock' || forestDensity(wx, wz) >= FOREST_THRESHOLD)
         entry.prop.position.set((wx - offsetX) * CELL, height, (wz - offsetZ) * CELL)
       }
 
@@ -372,7 +411,9 @@ export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
   const tiltShift = createTiltShiftPass()
 
   const app = createApp<ScapeState>(canvas, {
-    state: { speed: 1, panX: 0, panZ: 0, zoom: 1 },
+    // Open fully zoomed in — the miniature "leaned-in" framing, tilted toward the
+    // horizon with the thickest tilt-shift bokeh — rather than the wide map.
+    state: { speed: 1, panX: 0, panZ: 0, zoom: ZOOM_MAX },
     seed:  11,
     camera,
     scene: { background: '#0a0a14' },
@@ -388,8 +429,9 @@ export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
   })
 
   // Drag pans, wheel/pinch zooms. Pan writes state directly (a drag should
-  // track the pointer exactly), zoom eases toward a target below.
-  let zoomTarget = 1
+  // track the pointer exactly), zoom eases toward a target below. Seeded to the
+  // same fully-zoomed-in value as the initial state so nothing eases on load.
+  let zoomTarget = ZOOM_MAX
 
   const detach = attachPointerGesture(canvas, {
     onDrag (dx, dy) {
