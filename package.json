@@ -1,34 +1,80 @@
 {
   "name": "threejs-scene",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lightweight imperative three.js app shell: createApp + a small module contract. Deterministic clock, seeded rng, unidirectional state flow, strict dispose chain.",
   "type": "module",
-  "main": "./dist/lib/index.js",
+  "main": "./dist/cjs/lib/index.js",
   "types": "./dist/lib/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/lib/index.d.ts",
-      "import": "./dist/lib/index.js"
+      "import": {
+        "types": "./dist/lib/index.d.ts",
+        "default": "./dist/lib/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/lib/index.d.ts",
+        "default": "./dist/cjs/lib/index.js"
+      }
     },
     "./modules/lighting": {
-      "types": "./dist/modules/lighting/index.d.ts",
-      "import": "./dist/modules/lighting/index.js"
+      "import": {
+        "types": "./dist/modules/lighting/index.d.ts",
+        "default": "./dist/modules/lighting/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/lighting/index.d.ts",
+        "default": "./dist/cjs/modules/lighting/index.js"
+      }
     },
     "./modules/orbit": {
-      "types": "./dist/modules/orbit/index.d.ts",
-      "import": "./dist/modules/orbit/index.js"
+      "import": {
+        "types": "./dist/modules/orbit/index.d.ts",
+        "default": "./dist/modules/orbit/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/orbit/index.d.ts",
+        "default": "./dist/cjs/modules/orbit/index.js"
+      }
     },
     "./modules/post": {
-      "types": "./dist/modules/post/index.d.ts",
-      "import": "./dist/modules/post/index.js"
+      "import": {
+        "types": "./dist/modules/post/index.d.ts",
+        "default": "./dist/modules/post/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/post/index.d.ts",
+        "default": "./dist/cjs/modules/post/index.js"
+      }
     },
     "./modules/assets": {
-      "types": "./dist/modules/assets/index.d.ts",
-      "import": "./dist/modules/assets/index.js"
+      "import": {
+        "types": "./dist/modules/assets/index.d.ts",
+        "default": "./dist/modules/assets/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/assets/index.d.ts",
+        "default": "./dist/cjs/modules/assets/index.js"
+      }
+    },
+    "./modules/post/webgl": {
+      "import": {
+        "types": "./dist/modules/post/webgl/index.d.ts",
+        "default": "./dist/modules/post/webgl/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/post/webgl/index.d.ts",
+        "default": "./dist/cjs/modules/post/webgl/index.js"
+      }
     },
     "./modules/*": {
-      "types": "./dist/modules/*.d.ts",
-      "import": "./dist/modules/*.js"
+      "import": {
+        "types": "./dist/modules/*.d.ts",
+        "default": "./dist/modules/*.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/*.d.ts",
+        "default": "./dist/cjs/modules/*.js"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -40,13 +86,13 @@
   "sideEffects": false,
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json && tsc -p tsconfig.build.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
     "build:site": "vite build site",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "dev": "npm run build && vite site",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm run test",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build && publint && attw --pack .",
     "prepare": "npm run build"
   },
   "repository": {
@@ -71,9 +117,11 @@
     "@tuomashatakka/canvas-loop-framecapper": "^1.0.0"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@tuomashatakka/eslint-config": "^4.0.1",
     "@types/three": "^0.184.1",
     "eslint": "^10.7.0",
+    "publint": "^0.3.12",
     "three": "^0.184.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
@@ -88,5 +136,14 @@
   "homepage": "https://tuomashatakka.github.io/threejs-scene/",
   "bugs": {
     "url": "https://github.com/tuomashatakka/threejs-scene/issues"
+  },
+  "module": "./dist/lib/index.js",
+  "typesVersions": {
+    "*": {
+      "modules/*": [
+        "./dist/cjs/modules/*.d.ts",
+        "./dist/cjs/modules/*/index.d.ts"
+      ]
+    }
   }
 }

@@ -195,13 +195,50 @@ The frame loop is backed by
 — one shared `requestAnimationFrame` for the whole page; note that an `fps`
 cap applies page-globally.
 
+## Next.js and other SSR frameworks
+
+Every entry ships both ESM and CommonJS, so `require('threejs-scene')` resolves
+from a server bundle. That makes the package importable anywhere; it does not
+make it *renderable* anywhere. Everything here touches `window`, `document`, and
+`WebGLRenderer`, so it must run client-side only:
+
+```tsx
+// app/scene.tsx
+'use client'
+import { createApp } from 'threejs-scene'
+// … mount into a ref'd <canvas> inside useEffect, dispose on cleanup
+
+// app/page.tsx
+const Scene = dynamic(() => import('./scene'), { ssr: false })
+```
+
+`transpilePackages` is not needed — the CJS condition is what server-side
+resolution was missing.
+
+One caveat worth knowing before you `require()`: `three/addons/*` is ESM-only
+upstream (no `require` condition), and `modules/post`, `modules/post/webgl`, and
+`modules/lighting` import from it. Under `require()` those three need Node
+≥22.12 (where `require(esm)` landed) or a bundler. The root entry,
+`modules/orbit`, and `modules/assets` are addon-free and `require()` cleanly
+anywhere.
+
+Don't mix `import` and `require` of this package in one process — you get two
+copies of every module, so class identity and `instanceof` stop agreeing.
+
 ## Scripts
 
 `npm run dev` (build the package, then serve `site/` with Vite — the playground
 + live demo in one) · `npm test` (vitest) · `npm run typecheck` · `npm run lint` ·
-`npm run build` (clean, then tsc → `dist/`) · `npm run build:site` (Vite →
-`site/dist/`, the deployed site, which consumes the built package). CI builds
-both and publishes `site/dist` to GitHub Pages.
+`npm run build` (clean, then tsc → `dist/` ESM + `dist/cjs/` CommonJS) ·
+`npm run build:site` (Vite → `site/dist/`, the deployed site, which consumes the
+built package). CI builds both and publishes `site/dist` to GitHub Pages.
+
+The dual build is two `tsc` passes over the same sources — `tsconfig.build.json`
+(ESM) and `tsconfig.build.cjs.json` (CommonJS) — followed by writing
+`dist/cjs/package.json` with `{"type":"commonjs"}`. That marker is what makes
+the `dist/cjs/` subtree load as CJS inside a `"type": "module"` package.
+`prepublishOnly` gates publishing on `publint` + `attw --pack .`, which catch
+exports-map and type-condition regressions.
 
 `build` cleans `dist/` first on purpose: `tsc` never removes stale output, so a
 renamed or deleted module would otherwise linger and keep resolving.
