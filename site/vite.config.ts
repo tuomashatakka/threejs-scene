@@ -15,7 +15,7 @@ export default defineConfig({
   resolve: {
     alias: [
       // folder-with-index modules resolve to their index.js (first match wins)
-      { find: /^threejs-scene\/modules\/(lighting|orbit|post|assets|authoring)$/, replacement: `${dist('modules/')}$1/index.js` },
+      { find: /^threejs-scene\/modules\/(lighting|orbit|post|assets|authoring|physics)$/, replacement: `${dist('modules/')}$1/index.js` },
       { find: /^threejs-scene\/modules\/(.*)$/, replacement: `${dist('modules/')}$1.js` },
       { find: 'threejs-scene', replacement: dist('lib/index.js') },
     ],

@@ -55,6 +55,7 @@ const partSchema: JsonSchema = {
     shape:     { type: 'string', enum: SHAPE_NAMES, description: 'Which shape to build. plane, disc and ring are flat and lie on the ground.' },
     size:      { ...vec3, description: 'Size of the box the shape fills: [x, y, z] in metres.' },
     at:        { ...vec3, description: 'Centre of the part in metres: [x, y, z], y up, ground at 0. A part of height h rests on the ground at y = h/2.' },
+    on:        { type: 'string', description: 'Name of an EARLIER part to rest on top of. The height is worked out for you; "at" still sets x and z. Prefer this over guessing a y.' },
     rotate:    { ...vec3, description: 'Rotation in DEGREES around [x, y, z].' },
     color:     { type: 'string', description: 'Hex colour, e.g. "#8a4436".' },
     material:  { type: 'string', enum: SURFACE_NAMES, description: 'Surface finish.' },

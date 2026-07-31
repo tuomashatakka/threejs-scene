@@ -40,6 +40,9 @@ export { buildShape, fitToSize } from './shapes.js'
 export { resolvePlacements } from './layout.js'
 export type { Placement } from './layout.js'
 
+// relations — "rest this on that", solved numerically before anything is built
+export { resolveRelations } from './relations.js'
+
 // critique — measure the built thing and say what is wrong with it
 export { reviewProp } from './review.js'
 export type { PropReview } from './review.js'

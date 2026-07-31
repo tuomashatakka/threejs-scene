@@ -15,6 +15,7 @@
 import * as THREE from 'three'
 
 import { FLAT_SHAPES, PART_DEFAULTS, SHAPE_NAMES, SPEC_LIMITS, SURFACE_NAMES } from './spec.js'
+import { resolveRelations } from './relations.js'
 
 import type { MaterialPreset } from '../assets/index.js'
 import type {
@@ -182,6 +183,10 @@ const PART_KEY_ALIASES: Record<string, string> = {
   emissive:   'glow',
   array:      'repeat',
   instances:  'repeat',
+  ontopof:    'on',
+  restson:    'on',
+  stackedon:  'on',
+  above:      'on',
 }
 
 const HEX_COLOR    = /^#?(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
@@ -309,6 +314,10 @@ export function validatePropSpec (input: unknown): SpecReview {
     return finish(null, issues, name)
   }
 
+  // the model states the relation, the solver computes the height — the one
+  // thing every study of LLM 3D authoring agrees on
+  resolveRelations(parts, (path, message) => add('error', path, message))
+
   const spec: NormalizedPropSpec = {
     name,
     parts,
@@ -433,6 +442,7 @@ function readPart (
     shape,
     size,
     at:        readVec3(entry.at, [ 0, 0, 0 ], 1, `${path}.at`, add),
+    on:        typeof entry.on === 'string' && entry.on.trim() !== '' ? entry.on.trim() : null,
     rotate:    readVec3(entry.rotate, [ 0, 0, 0 ], 1, `${path}.rotate`, add),
     color:     readColor(entry.color, `${path}.color`, add),
     material:  readSurface(entry.material, `${path}.material`, add),

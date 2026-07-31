@@ -30,6 +30,7 @@ function normalizedPart (overrides: Partial<NormalizedPart> = {}): NormalizedPar
     shape:     'box',
     size:      [ 1, 1, 1 ],
     at:        [ 0, 0, 0 ],
+    on:        null,
     rotate:    [ 0, 0, 0 ],
     color:     '#ffffff',
     material:  'matte',
@@ -514,5 +515,78 @@ describe('shape coverage', () => {
     expect(prop.parts.size).toBe(SHAPE_NAMES.length)
     expect(reviewProp(prop).triangles).toBeGreaterThan(0)
     prop.dispose()
+  })
+})
+
+describe('relations', () => {
+  it('stacks a part on top of an earlier one and solves the height', () => {
+    const spec = validatePropSpec({
+      name:  'table',
+      parts: [
+        { name: 'base', shape: 'cylinder', size: [ 0.4, 0.1, 0.4 ], at: [ 0, 0.05, 0 ]},
+        { name: 'stem', shape: 'cylinder', size: [ 0.1, 0.7, 0.1 ], on: 'base' },
+        { name: 'top', shape: 'cylinder', size: [ 0.8, 0.04, 0.8 ], on: 'stem' },
+      ],
+    }).spec
+
+    expect(spec?.parts[1]?.at[1]).toBeCloseTo(0.45, 6) // 0.1 tall base + half of 0.7
+    expect(spec?.parts[2]?.at[1]).toBeCloseTo(0.82, 6) // base + stem + half of 0.04
+  })
+
+  it('measures the support across every repeat copy', () => {
+    const spec = validatePropSpec({
+      parts: [
+        { name: 'leg', shape: 'box', size: [ 0.06, 0.5, 0.06 ], at: [ 0.2, 0.25, 0.2 ], repeat: { count: 4, mode: 'mirror', axis: 'x' }},
+        { name: 'seat', shape: 'box', size: [ 0.5, 0.06, 0.5 ], on: 'leg' },
+      ],
+    }).spec
+
+    expect(spec?.parts[1]?.at[1]).toBeCloseTo(0.53, 6)
+  })
+
+  it('keeps x and z from "at" — "on" only decides the height', () => {
+    const spec = validatePropSpec({
+      parts: [
+        { name: 'plinth', shape: 'box', size: [ 2, 0.4, 2 ], at: [ 0, 0.2, 0 ]},
+        { name: 'urn', shape: 'sphere', size: [ 0.3, 0.3, 0.3 ], at: [ 0.6, 99, -0.4 ], on: 'plinth' },
+      ],
+    }).spec
+
+    expect(spec?.parts[1]?.at).toEqual([ 0.6, 0.55, -0.4 ])
+  })
+
+  it('rejects a forward reference rather than guessing', () => {
+    const review = validatePropSpec({
+      parts: [
+        { name: 'lid', shape: 'box', size: 1, on: 'body' },
+        { name: 'body', shape: 'box', size: 1, at: [ 0, 0.5, 0 ]},
+      ],
+    })
+
+    expect(review.ok).toBe(false)
+    expect(review.report).toMatch(/built after this part/)
+  })
+
+  it('names the parts that were available when it cannot find the support', () => {
+    const review = validatePropSpec({
+      parts: [
+        { name: 'base', shape: 'box', size: 1, at: [ 0, 0.5, 0 ]},
+        { name: 'hat', shape: 'box', size: 0.4, on: 'bass' },
+      ],
+    })
+
+    expect(review.ok).toBe(false)
+    expect(review.report).toMatch(/Earlier parts: base/)
+  })
+
+  it('reads the aliases a model reaches for', () => {
+    const spec = validatePropSpec({
+      parts: [
+        { name: 'crate', shape: 'box', size: 1, at: [ 0, 0.5, 0 ]},
+        { name: 'sack', shape: 'sphere', size: 0.4, onTopOf: 'crate' },
+      ],
+    }).spec
+
+    expect(spec?.parts[1]?.at[1]).toBeCloseTo(1.2, 6)
   })
 })

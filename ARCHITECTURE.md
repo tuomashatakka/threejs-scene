@@ -142,6 +142,14 @@ modules/                // behavior on top of the public API — every entry is 
     materials.ts        //     MATERIAL_PRESETS, createStandardMaterial, toon
     textures.ts         //     seeded, DOM-free procedural DataTextures
     props.ts            //     starter catalogue built on Prop
+    facets.ts           //     baked facet colours, grime, the one kit material
+    parts.ts            //     part() + mergeParts() (three's BufferGeometryUtils)
+    kit.ts              //     14 wasteland props, each ONE merged geometry
+    scatter.ts          //     placement solver (keep-out rules) + InstancedMesh
+  physics/              //   OPTIONAL layer over cannon-es (optional peer dep)
+    world.ts            //     fixed-step world as an AppModule + body sync
+    cloth.ts            //     particle grid + distance constraints
+    liquid.ts           //     cannon's SPHSystem, drawn as instanced drops
   authoring/            //   prop authoring FOR LANGUAGE MODELS — the only module
                         //     that depends on another (assets, for Prop)
     spec.ts             //     the JSON dialect: vocabulary, budgets, defaults
@@ -152,6 +160,7 @@ modules/                // behavior on top of the public API — every entry is 
     review.ts           //     critique the BUILT prop: floats, detached, buried
     schema.ts           //     JSON Schema, generated from the same constants
     prompt.ts           //     grammar + worked examples + the correction turn
+    relations.ts        //     "on": stated relation -> solved coordinate
     tool.ts             //     provider-agnostic tool def + generate/critique loop
 
 site/                   // vite-built public site: landing (index.html), one
@@ -219,6 +228,14 @@ try again. It is the one module that imports another (`modules/assets`, for
 `Prop` and the material presets) — and only through that module's public index,
 so the layering rule still holds. Nothing in it touches the DOM or a GL context,
 so the whole pipeline runs server-side and headless.
+
+Physics landed as an additive layer too, and as the first OPTIONAL peer
+dependency: `modules/physics` wraps cannon-es (pure ESM, no wasm, no async init,
+so it steps the same headless as in a browser) in a fixed-step AppModule, with
+cloth built from the engine's own particles and constraints and liquid from its
+SPH subsystem. Both live in the same world as the rigid bodies, so they interact
+without a bridge. Nothing else in the package imports cannon-es; a consumer who
+never touches physics never installs it.
 
 Post-processing landed as exactly such an additive layer: `postProcessing()` in
 `modules/`, wired through the module `render` hook (item 5 above), with the WebGL

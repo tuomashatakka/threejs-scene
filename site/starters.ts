@@ -14,12 +14,14 @@ import { mount as mountIsometricSqr } from './templates/isometric-sqr'
 import { mount as mountHovership } from './templates/hovership'
 import { mount as mountProduct } from './templates/product'
 import { mount as mountPropAuthoring } from './templates/prop-authoring'
+import { mount as mountPhysics } from './templates/physics'
 
 import isometricSource from './templates/isometric.ts?raw'
 import isometricSqrSource from './templates/isometric-sqr.ts?raw'
 import hovershipSource from './templates/hovership.ts?raw'
 import productSource from './templates/product.ts?raw'
 import propAuthoringSource from './templates/prop-authoring.ts?raw'
+import physicsSource from './templates/physics.ts?raw'
 
 import { attachCollapse } from './collapse'
 
@@ -63,6 +65,14 @@ const STARTERS: Starter[] = [
     file:   'templates/hovership.ts',
     source: hovershipSource,
     mount:  asStarterMount(mountHovership as never),
+  },
+  {
+    id:     'physics',
+    title:  'Salvage yard physics',
+    blurb:  'Cloth, liquid and kinetics in one deterministic world: a tarp breathing in the wind, SPH fluid sloshing in a basin, and barrels coming down a ramp — all stepped by the same fixed clock, on scenery placed by the keep-out solver.',
+    file:   'templates/physics.ts',
+    source: physicsSource,
+    mount:  asStarterMount(mountPhysics as never),
   },
   {
     id:     'prop-authoring',

@@ -37,6 +37,7 @@ Rules
 - Units are metres. y is up. The ground is y = 0. Centre the prop on x = 0, z = 0.
 - "size" is the box the shape FILLS: [x, y, z]. A sphere with size [1,2,1] is an egg.
 - "at" is the CENTRE of the part. A part h tall rests on the ground at y = h/2.
+- Better than guessing a height: "on": "<name of an earlier part>" stacks this part on top of it.
 - "size" is measured before "rotate". Rotating a [0.1, 1, 0.1] post by 90 degrees lays it down.
 - "rotate" is in DEGREES: [x, y, z].
 - Parts must touch or overlap each other — a prop is one connected object.
@@ -47,6 +48,7 @@ Fields per part
   shape     ${SHAPE_NAMES.join(' | ')}
   size      [x, y, z] in metres
   at        [x, y, z] centre, in metres
+  on        name of an earlier part to stand on  (optional)
   rotate    [x, y, z] in degrees            (optional)
   color     hex, e.g. "#8a4436"             (optional)
   material  ${SURFACE_NAMES.join(' | ')}
@@ -83,6 +85,17 @@ export const PROP_EXAMPLES: readonly PropExample[] = [
           color:  '#7a5c3c',
           repeat: { count: 4, mode: 'mirror', axis: 'x' },
         },
+      ],
+    },
+  },
+  {
+    brief: 'a small round table, using "on" instead of guessing heights',
+    spec:  {
+      name:  'round table',
+      parts: [
+        { name: 'base', shape: 'cylinder', size: [ 0.4, 0.05, 0.4 ], at: [ 0, 0.025, 0 ], color: '#4a3728' },
+        { name: 'stem', shape: 'cylinder', size: [ 0.09, 0.68, 0.09 ], at: [ 0, 0, 0 ], on: 'base', color: '#4a3728' },
+        { name: 'top', shape: 'cylinder', size: [ 0.8, 0.05, 0.8 ], at: [ 0, 0, 0 ], on: 'stem', color: '#8a6a44' },
       ],
     },
   },

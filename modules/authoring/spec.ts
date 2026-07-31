@@ -126,6 +126,12 @@ export interface PartSpec {
   /** Centre of the part, in metres, y up, ground at 0. @defaultValue `[0, 0, 0]` */
   at?: SpecVec3 | number
 
+  /**
+   * Rest this part on top of an earlier part, by name. The compiler works out
+   * the height; `at` still sets x and z. Use it instead of guessing a y.
+   */
+  on?: string
+
   /** Rotation in DEGREES around x, y, z. @defaultValue `[0, 0, 0]` */
   rotate?: SpecVec3 | number
 
@@ -178,10 +184,13 @@ export interface PropSpec {
 
 /** A {@link PartSpec} with every field resolved, clamped, and defaulted. */
 export interface NormalizedPart {
-  name:      string
-  shape:     ShapeName
-  size:      SpecVec3
-  at:        SpecVec3
+  name:  string
+  shape: ShapeName
+  size:  SpecVec3
+  at:    SpecVec3
+
+  /** Name of the part this one rests on, or `null`. Already resolved into `at`. */
+  on:        string | null
   rotate:    SpecVec3
   color:     string
   material:  MaterialPreset
