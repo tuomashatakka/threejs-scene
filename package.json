@@ -56,6 +56,16 @@
         "default": "./dist/cjs/modules/assets/index.js"
       }
     },
+    "./modules/authoring": {
+      "import": {
+        "types": "./dist/modules/authoring/index.d.ts",
+        "default": "./dist/modules/authoring/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/authoring/index.d.ts",
+        "default": "./dist/cjs/modules/authoring/index.js"
+      }
+    },
     "./modules/post/webgl": {
       "import": {
         "types": "./dist/modules/post/webgl/index.d.ts",

@@ -142,6 +142,17 @@ modules/                // behavior on top of the public API — every entry is 
     materials.ts        //     MATERIAL_PRESETS, createStandardMaterial, toon
     textures.ts         //     seeded, DOM-free procedural DataTextures
     props.ts            //     starter catalogue built on Prop
+  authoring/            //   prop authoring FOR LANGUAGE MODELS — the only module
+                        //     that depends on another (assets, for Prop)
+    spec.ts             //     the JSON dialect: vocabulary, budgets, defaults
+    shapes.ts           //     shape word -> geometry that fills its size box
+    layout.ts           //     repeat (linear|radial|mirror) -> placements
+    validate.ts         //     forgiving parse: repair, clamp, report
+    build.ts            //     spec -> Prop, deterministic, geometry/material shared
+    review.ts           //     critique the BUILT prop: floats, detached, buried
+    schema.ts           //     JSON Schema, generated from the same constants
+    prompt.ts           //     grammar + worked examples + the correction turn
+    tool.ts             //     provider-agnostic tool def + generate/critique loop
 
 site/                   // vite-built public site: landing (index.html), one
                         //   interactive page (app.html) that is BOTH the dev
@@ -199,6 +210,15 @@ Lifecycle event emitter, async `app.ready`, worker update bridges, a
 declarative JSX layer (and possibly a react adapter) on top of this same core,
 particles, voxels, instancing. Each lands as an additive layer — nothing in
 this plan blocks them.
+
+LLM prop authoring landed the same way, as `modules/authoring`: a JSON dialect
+small models can actually hit, a validator that repairs their habitual mistakes
+rather than rejecting them, a deterministic compiler to `Prop`, and a critic that
+measures the built geometry so the model can be told what is wrong with it and
+try again. It is the one module that imports another (`modules/assets`, for
+`Prop` and the material presets) — and only through that module's public index,
+so the layering rule still holds. Nothing in it touches the DOM or a GL context,
+so the whole pipeline runs server-side and headless.
 
 Post-processing landed as exactly such an additive layer: `postProcessing()` in
 `modules/`, wired through the module `render` hook (item 5 above), with the WebGL

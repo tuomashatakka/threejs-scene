@@ -13,11 +13,13 @@ import { mount as mountIsometric } from './templates/isometric'
 import { mount as mountIsometricSqr } from './templates/isometric-sqr'
 import { mount as mountHovership } from './templates/hovership'
 import { mount as mountProduct } from './templates/product'
+import { mount as mountPropAuthoring } from './templates/prop-authoring'
 
 import isometricSource from './templates/isometric.ts?raw'
 import isometricSqrSource from './templates/isometric-sqr.ts?raw'
 import hovershipSource from './templates/hovership.ts?raw'
 import productSource from './templates/product.ts?raw'
+import propAuthoringSource from './templates/prop-authoring.ts?raw'
 
 import { attachCollapse } from './collapse'
 
@@ -61,6 +63,14 @@ const STARTERS: Starter[] = [
     file:   'templates/hovership.ts',
     source: hovershipSource,
     mount:  asStarterMount(mountHovership as never),
+  },
+  {
+    id:     'prop-authoring',
+    title:  'LLM prop authoring',
+    blurb:  'Every object here was JSON a moment ago — the dialect a small model emits, compiled, measured, and critiqued. Two of them came from deliberately sloppy model output; the console shows what the model gets told back.',
+    file:   'templates/prop-authoring.ts',
+    source: propAuthoringSource,
+    mount:  asStarterMount(mountPropAuthoring as never),
   },
   {
     id:     'product',

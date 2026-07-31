@@ -87,8 +87,9 @@ Every effect's parameters are adjustable live in the
 
 ## Starter templates
 
-Three scaffolded apps — an isometric tilt-shift endless scape, a third-person
-hovership racer, and a studio product display — are on the
+Four scaffolded apps — an isometric tilt-shift endless scape, a third-person
+hovership racer, a studio product display, and a gallery of props compiled from
+LLM-authored JSON — are on the
 [starters page](https://tuomashatakka.github.io/threejs-scene/starters.html),
 each showing its complete source beside the running scene. The source is
 imported twice (as a module to run, and via Vite's `?raw` to display), so the
@@ -108,6 +109,10 @@ Each one is a worked example of tying a camera to something else in the scene:
 - **Product** — the camera revolves around a product that never moves (so the
   key light rakes across it, which spinning the object cannot fake), and the
   pointer leans the rig a few degrees for parallax.
+- **LLM prop authoring** — every object on the plinth was JSON a moment ago,
+  compiled by `modules/authoring`. Two of them came from deliberately sloppy
+  model output; the console prints what each prop's critique would tell the
+  model back.
 
 ## Content: props, materials, textures
 
@@ -134,6 +139,69 @@ Also here: `MATERIAL_PRESETS` (`metal`, `chrome`, `gold`, `plastic`, `rubber`,
 textures (`createGridTexture`, `createNoiseTexture`, `createGradientTexture`),
 and a starter prop catalogue (`crystalProp`, `rockProp`, `treeProp`,
 `lampPostProp`).
+
+## Props from language models
+
+`modules/authoring` lets a **small** model author props. Not by writing
+three.js — by filling in a tiny JSON dialect that is validated, compiled, and
+then critiqued, so the model can fix its own mistakes:
+
+```ts
+import { createPropTool, generateProp, buildProp } from 'threejs-scene/modules/authoring'
+
+scene.add(buildProp({
+  name:  'crate',
+  parts: [
+    { name: 'body', shape: 'box', size: [ 0.8, 0.8, 0.8 ], at: [ 0, 0.4, 0 ], color: '#8a6a44' },
+    { name: 'band', shape: 'box', size: [ 0.84, 0.07, 0.84 ], at: [ 0, 0.08, 0 ],
+      repeat: { count: 2, mode: 'linear', offset: [ 0, 0.64, 0 ] }},
+  ],
+}))
+```
+
+The dialect is designed around what small models get right. Units are metres,
+y is up, the ground is `y = 0`. Every shape — `box`, `sphere`, `cylinder`,
+`cone`, `pyramid`, `prism`, `capsule`, `torus`, `knot`, `crystal`, `rock`,
+`wedge`, `plane`, `disc`, `ring` — is sized by the box it fills, so there are no
+constructor signatures to remember. Rotations are in degrees. `repeat`
+(`linear` / `radial` / `mirror`) covers legs, spokes and railings, so four table
+legs are one part, not four chances to fat-finger a coordinate.
+
+Four pieces, each usable on its own:
+
+```ts
+import {
+  validatePropSpec,   // repairs "cube" → "box", "position" → "at", "0.4" → 0.4, …
+  buildProp,          // spec → Prop, deterministic, one geometry per part
+  reviewProp,         // measures the BUILT prop: floats? detached? buried? too heavy?
+  propAuthoringPrompt // the grammar + worked examples, ~2.8k chars (or 1.4k compact)
+} from 'threejs-scene/modules/authoring'
+```
+
+`createPropTool()` packages them as a provider-agnostic tool definition — a
+name, a description, a JSON Schema (`PROP_SPEC_SCHEMA`), and a `run` that never
+throws — so it drops into Anthropic `input_schema`, OpenAI/Gemini `parameters`,
+an ai-sdk tool, or a constrained decoder for a local model.
+
+`generateProp()` closes the loop, which is where the quality actually comes
+from — one shot from a 3B model is a coin flip, but the same model, told *"the
+prop floats 0.4m above the ground"*, usually fixes it next turn:
+
+```ts
+const { prop, review, attempts } = await generateProp({
+  brief:    'a mossy stone well',
+  attempts: 3,
+  complete: async ({ system, prompt }) => callYourModel(system, prompt),  // any model, any SDK
+})
+
+scene.add(prop)
+console.log(review.report)
+// mossy stone well: 7 meshes, 1.4k triangles, 1.2 × 1.6 × 1.2m, sits on the ground
+```
+
+Everything is DOM-free and GL-free: a server can validate, build, measure, and
+critique a prop with no canvas anywhere. See the **LLM prop authoring** starter
+for the whole path running live, sloppy model output included.
 
 ## Cameras
 
