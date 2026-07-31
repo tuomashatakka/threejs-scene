@@ -23,6 +23,11 @@ function boxMesh (size = 1): THREE.Mesh {
   return new THREE.Mesh(new THREE.BoxGeometry(size, size, size), new THREE.MeshBasicMaterial())
 }
 
+function minimumY (object: THREE.Object3D): number {
+  object.updateWorldMatrix(true, true)
+  return new THREE.Box3().setFromObject(object).min.y
+}
+
 
 describe('physicsWorld', () => {
   it('drops a box onto the ground and lets it come to rest', () => {
@@ -124,6 +129,127 @@ describe('physicsWorld', () => {
     expect(mesh.position.y).toBe(fell) // no longer driven
     physics.dispose?.()
   })
+
+  it('grounds centered and base-pivoted geometry at the same world height', () => {
+    const physics = physicsWorld({ iterations: 20 })
+    addGroundPlane(physics)
+
+    const centered = boxMesh()
+    centered.position.set(-1, 4, 0)
+
+    const basedGeometry = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
+    const based         = new THREE.Mesh(basedGeometry, new THREE.MeshBasicMaterial())
+    based.position.set(1, 4, 0)
+    physics.add(centered, { mass: 1 })
+    physics.add(based, { mass: 1 })
+
+    run(physics, 3)
+
+    expect(minimumY(centered)).toBeCloseTo(0, 1)
+    expect(minimumY(based)).toBeCloseTo(0, 1)
+    physics.dispose?.()
+  })
+
+  it('keeps a rotated child aligned while synchronizing through its parent', () => {
+    const physics = physicsWorld({ iterations: 20 })
+    addGroundPlane(physics)
+
+    const parent = new THREE.Group()
+    parent.position.set(2, 0.5, -1)
+    parent.rotation.y = 0.35
+
+    const child       = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.6), new THREE.MeshBasicMaterial())
+    child.position.set(0.4, 4, -0.3)
+    child.rotation.z = 0.28
+    parent.add(child)
+    physics.add(child, { mass: 2 })
+
+    run(physics, 3)
+
+    expect(minimumY(child)).toBeCloseTo(0, 1)
+
+    const bodyPosition = physics.world.bodies.at(-1)?.position
+    const visualCenter = new THREE.Box3().setFromObject(child)
+      .getCenter(new THREE.Vector3())
+    expect(visualCenter.distanceTo(new THREE.Vector3(bodyPosition?.x, bodyPosition?.y, bodyPosition?.z))).toBeLessThan(0.08)
+    physics.dispose?.()
+  })
+
+  it('copies kinematic object transforms before every fixed step', () => {
+    const physics = physicsWorld()
+    const parent  = new THREE.Group()
+    parent.position.set(3, 1, -2)
+
+    const platform = boxMesh()
+    platform.position.set(1, 2, 0)
+    parent.add(platform)
+
+    const body = physics.add(platform, { kinematic: true })
+
+    run(physics, 1 / 60)
+    expect(body.position.x).toBeCloseTo(4, 5)
+    expect(body.position.y).toBeCloseTo(3, 5)
+
+    platform.position.y = 4
+    parent.rotation.y   = 0.5
+    run(physics, 1 / 60)
+
+    const center = new THREE.Box3().setFromObject(platform)
+      .getCenter(new THREE.Vector3())
+    expect(body.position.x).toBeCloseTo(center.x, 5)
+    expect(body.position.y).toBeCloseTo(center.y, 5)
+    physics.dispose?.()
+  })
+
+  it('binds direct children independently with addEach', () => {
+    const physics = physicsWorld()
+    addGroundPlane(physics)
+
+    const group = new THREE.Group()
+    const left  = boxMesh(0.5)
+    const right = boxMesh(0.5)
+    left.position.set(-0.5, 2, 0)
+    right.position.set(0.5, 2, 0)
+    group.add(left, right)
+
+    const bodies = physics.addEach(group, (_object, index) => ({
+      mass:     1,
+      velocity: [ index === 0 ? -1 : 1, 0, 0 ],
+    }))
+
+    run(physics, 1)
+
+    expect(bodies).toHaveLength(2)
+    expect(left.position.x).toBeLessThan(-1)
+    expect(right.position.x).toBeGreaterThan(1)
+    physics.dispose?.()
+  })
+
+  it('lets high-friction bodies lose lateral speed faster', () => {
+    const slide = (friction: number): number => {
+      const physics = physicsWorld({ iterations: 20 })
+      addGroundPlane(physics)
+
+      const mesh      = boxMesh()
+      mesh.position.y = 0.51
+
+      const body      = physics.add(mesh, {
+        mass:           1,
+        friction,
+        restitution:    0,
+        velocity:       [ 4, 0, 0 ],
+        linearDamping:  0,
+        angularDamping: 1,
+      })
+      run(physics, 1.25)
+
+      const speed = Math.abs(body.velocity.x)
+      physics.dispose?.()
+      return speed
+    }
+
+    expect(slide(1)).toBeLessThan(slide(0) * 0.5)
+  })
 })
 
 describe('createCloth', () => {
@@ -213,68 +339,115 @@ describe('createCloth', () => {
 })
 
 describe('createLiquid', () => {
-  it('pours into a basin and stays in it', () => {
+  it('replays deterministically and stays finite for ten simulated seconds', () => {
+    const simulate = (): number[] => {
+      const physics = physicsWorld()
+      addGroundPlane(physics)
+
+      const liquid = createLiquid(physics, {
+        count:      48,
+        at:         [ 0, 1.2, 0 ],
+        spawn:      [ 0.6, 0.6, 0.6 ],
+        renderMode: 'particles',
+        rng:        createSeededRng(17),
+      })
+      run(physics, 10)
+
+      const result = liquid.particles.flatMap(body => [ body.position.x, body.position.y, body.position.z ])
+      expect(result.every(Number.isFinite)).toBe(true)
+      liquid.dispose()
+      physics.dispose?.()
+      return result
+    }
+
+    expect(simulate()).toEqual(simulate())
+  })
+
+  it('pours into a narrow basin without losing its occupied volume', () => {
     const physics = physicsWorld()
     addGroundPlane(physics)
-    for (const [ x, z ] of [[ 1.1, 0 ], [ -1.1, 0 ], [ 0, 1.1 ], [ 0, -1.1 ]] as const)
-      addStaticBox(physics, [ x === 0 ? 2.4 : 0.2, 2, z === 0 ? 2.4 : 0.2 ], [ x, 1, z ])
+    for (const [ x, z ] of [[ 0.7, 0 ], [ -0.7, 0 ], [ 0, 0.7 ], [ 0, -0.7 ]] as const)
+      addStaticBox(physics, [ x === 0 ? 1.6 : 0.2, 2, z === 0 ? 1.6 : 0.2 ], [ x, 1, z ])
 
     const liquid = createLiquid(physics, {
-      count: 120,
-      at:    [ 0, 2, 0 ],
-      spawn: [ 0.9, 0.9, 0.9 ],
-      rng:   createSeededRng(7),
+      count:      96,
+      at:         [ 0, 1.5, 0 ],
+      spawn:      [ 0.8, 0.9, 0.8 ],
+      renderMode: 'particles',
+      rng:        createSeededRng(7),
     })
+    const initialHeight = Math.max(...liquid.particles.map(body => body.position.y)) - Math.min(...liquid.particles.map(body => body.position.y))
 
-    run(physics, 2.5)
+    run(physics, 4)
 
     for (const body of liquid.particles) {
-      expect(Math.abs(body.position.x)).toBeLessThan(1.4)
-      expect(Math.abs(body.position.z)).toBeLessThan(1.4)
-      expect(body.position.y).toBeGreaterThan(-0.5)
+      expect(Math.abs(body.position.x)).toBeLessThan(0.75)
+      expect(Math.abs(body.position.z)).toBeLessThan(0.75)
+      expect(body.position.y).toBeGreaterThan(-0.1)
       expect(Number.isFinite(body.position.y)).toBe(true)
     }
 
-    // it settled: the column is lower and wider than it started
-    const top = Math.max(...liquid.particles.map(body => body.position.y))
-    expect(top).toBeLessThan(2.45)
+    const extent = (axis: 'x' | 'y' | 'z'): number =>
+      Math.max(...liquid.particles.map(body => body.position[axis])) -
+      Math.min(...liquid.particles.map(body => body.position[axis])) + 0.16
+    const occupiedVolume = extent('x') * extent('y') * extent('z')
+    const particleVolume = liquid.particles.length * 4 / 3 * Math.PI * 0.08 ** 3
+    expect(initialHeight).toBeGreaterThan(0)
+    expect(occupiedVolume).toBeGreaterThan(particleVolume * 0.75)
     liquid.dispose()
     physics.dispose?.()
   })
 
-  it('spreads out instead of collapsing to a point', () => {
+  it('sloshes laterally and transfers contact to a rigid body', () => {
     const physics = physicsWorld()
     addGroundPlane(physics)
+    for (const x of [ -1.1, 1.1 ])
+      addStaticBox(physics, [ 0.2, 1.5, 2.4 ], [ x, 0.75, 0 ])
+    for (const z of [ -1.1, 1.1 ])
+      addStaticBox(physics, [ 2.4, 1.5, 0.2 ], [ 0, 0.75, z ])
 
-    const liquid = createLiquid(physics, { count: 80, at: [ 0, 1.2, 0 ], spawn: [ 0.6, 0.6, 0.6 ], rng: createSeededRng(3) })
+    const obstacle = boxMesh(0.35)
+    obstacle.position.set(0.45, 0.7, 0)
 
-    run(physics, 2)
+    const obstacleBody = physics.add(obstacle, { mass: 0.25, friction: 0.1 })
 
-    const spread = Math.max(...liquid.particles.map(body => Math.hypot(body.position.x, body.position.z)))
-    expect(spread).toBeGreaterThan(0.3) // a puddle, not a pile
+    const liquid = createLiquid(physics, {
+      count:      72,
+      at:         [ -0.45, 1.1, 0 ],
+      spawn:      [ 0.55, 0.7, 0.7 ],
+      renderMode: 'particles',
+      rng:        createSeededRng(3),
+    })
+    for (const particle of liquid.particles)
+      particle.velocity.x = 1.8
+
+    run(physics, 1.5)
+
+    const averageX = liquid.particles.reduce((sum, body) => sum + body.position.x, 0) / liquid.particles.length
+    expect(averageX).toBeGreaterThan(-0.2)
+    expect(obstacleBody.position.x).toBeGreaterThan(0.45)
     liquid.dispose()
     physics.dispose?.()
   })
 
-  it('drives one instanced mesh and cleans up after itself', () => {
+  it('builds a non-empty cohesive surface, resets, and cleans up', () => {
     const physics = physicsWorld()
     const before  = physics.world.bodies.length
-    const liquid  = createLiquid(physics, { count: 24, rng: createSeededRng(1) })
+    const liquid  = createLiquid(physics, { count: 36, rng: createSeededRng(1), resolution: 18 })
+    const start   = liquid.particles.map(body => body.position.clone())
 
-    expect(liquid.mesh.count).toBe(24)
-    expect(physics.world.subsystems).toContain(liquid.sph)
+    expect(liquid.mesh.geometry.drawRange.count).toBeGreaterThan(0)
+    expect(liquid.solver.density).toBeGreaterThan(0)
 
     run(physics, 0.2)
+    expect((liquid.particles[0] as CANNON.Body).position.y).not.toBeCloseTo((start[0] as CANNON.Vec3).y, 5)
+    liquid.reset()
 
-    const matrix = new THREE.Matrix4()
-    liquid.mesh.getMatrixAt(0, matrix)
-
-    const at = new THREE.Vector3().setFromMatrixPosition(matrix)
-    expect(at.y).toBeCloseTo((liquid.particles[0] as CANNON.Body).position.y, 5)
+    for (let i = 0; i < start.length; i++)
+      expect((liquid.particles[i] as CANNON.Body).position.distanceTo(start[i] as CANNON.Vec3)).toBeCloseTo(0, 6)
 
     liquid.dispose()
     expect(physics.world.bodies.length).toBe(before)
-    expect(physics.world.subsystems).not.toContain(liquid.sph)
     physics.dispose?.()
   })
 })

@@ -1,4 +1,4 @@
-// modules/authoring/index.ts
+// modules/assets/authoring/index.ts
 // Prop authoring for language models: a JSON dialect, a forgiving validator, a
 // deterministic compiler, and a critic that tells the model what it got wrong.
 //
@@ -7,7 +7,7 @@
 // GL-free, so a server can validate, build, measure, and critique a prop without
 // a canvas anywhere in sight, and a test can do the same headless.
 //
-//   import { generateProp, createPropTool } from 'threejs-scene/modules/authoring'
+//   import { generateProp, createPropTool } from 'threejs-scene/modules/assets'
 //
 //   const { prop, review } = await generateProp({ brief: 'a mossy stone well', complete })
 //   scene.add(prop)

@@ -1,4 +1,4 @@
-// modules/authoring/spec.ts
+// modules/assets/authoring/spec.ts
 // The prop spec: a tiny JSON dialect a small language model can emit reliably.
 //
 // Every design choice here trades expressiveness for hit rate. A 3B model does
@@ -15,7 +15,7 @@
 // Nothing here touches three.js: a spec is plain JSON that survives a tool call,
 // a log line, and a round trip through a model that only speaks text.
 
-import type { MaterialPreset } from '../assets/index.js'
+import type { MaterialPreset } from '../materials.js'
 
 
 /** A 3-component tuple in the spec: `[x, y, z]`. */

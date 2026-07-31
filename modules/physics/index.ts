@@ -24,6 +24,6 @@ export type { BodyOptions, BodyShape, PhysicsApi, PhysicsHandle, PhysicsWorldOpt
 export { createCloth } from './cloth.js'
 export type { Cloth, ClothOptions, ClothPinning } from './cloth.js'
 
-// liquid — cannon's SPH subsystem, drawn as instanced drops
+// liquid — spatial-hashed position-based fluid, surfaced with marching cubes
 export { createLiquid } from './liquid.js'
-export type { Liquid, LiquidOptions } from './liquid.js'
+export type { Liquid, LiquidOptions, LiquidRenderMode, LiquidSolver } from './liquid.js'

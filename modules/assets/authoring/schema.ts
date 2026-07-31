@@ -1,4 +1,4 @@
-// modules/authoring/schema.ts
+// modules/assets/authoring/schema.ts
 // The spec as JSON Schema, for structured output and function calling.
 //
 // It is generated from the same constants the compiler uses, so the enum a
@@ -23,6 +23,7 @@ export interface JsonSchema {
   minimum?:              number
   maximum?:              number
   default?:              unknown
+  oneOf?:                readonly JsonSchema[]
 }
 
 const vec3: JsonSchema = {

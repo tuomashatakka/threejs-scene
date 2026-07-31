@@ -166,3 +166,33 @@ aside[data-source] {
 @media (prefers-reduced-motion: reduce) {
   nav[data-tabs] button { transition: none; }
 }
+
+@media (max-width: 37.5rem) {
+  header[data-bar] {
+    flex-wrap: nowrap;
+    gap:       var(--space-xs);
+  }
+
+  header[data-bar] > a.back:last-child { display: none; }
+
+  nav[data-tabs] {
+    flex:       1;
+    flex-wrap:  nowrap;
+    min-width:  0;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+    & button { flex: 0 0 auto; }
+  }
+
+  [data-panel] {
+    width:     calc(100vw - 3rem);
+    max-width: none;
+  }
+
+  [data-panel] > button[data-collapse] {
+    min-width:  2.75rem;
+    min-height: 2.75rem;
+  }
+}

@@ -1,4 +1,4 @@
-// modules/authoring/relations.ts
+// modules/assets/authoring/relations.ts
 // "on": the one relation, solved numerically.
 //
 // This is the single highest-value thing you can add to a dialect a small model

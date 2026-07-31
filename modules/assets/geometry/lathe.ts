@@ -1,0 +1,43 @@
+// lib/geometry/lathe.ts
+// Lathe (surface-of-revolution) meshes — vases, bottles, columns, lamp bodies.
+// Feed a half-profile (x = radius, y = height) and it revolves around Y.
+
+import * as THREE from 'three'
+
+
+/** Options for {@link createLatheMesh}: radial `segments`, partial-revolution angles, and material. */
+export interface LatheOptions {
+  segments?:  number
+  phiStart?:  number
+  phiLength?: number
+  material?:  THREE.Material
+}
+
+/** Revolve a 2D profile of `[radius, y]` pairs around the Y axis — vases, columns, chess pieces. `segments` defaults to 32. */
+export function createLatheMesh (
+  profile: ReadonlyArray<readonly [number, number] | THREE.Vector2>,
+  options: LatheOptions = {},
+): THREE.Mesh {
+  if (profile.length < 2)
+    throw new Error('createLatheMesh: profile needs at least 2 points')
+
+  const {
+    segments = 32,
+    phiStart = 0,
+    phiLength = Math.PI * 2,
+    material = new THREE.MeshStandardMaterial({ color: '#c0c8d0', roughness: 0.5, metalness: 0.2 }),
+  } = options
+
+  const pts = profile.map(p =>
+    p instanceof THREE.Vector2 ? p : new THREE.Vector2(p[0], p[1]))
+
+  const geometry = new THREE.LatheGeometry(pts, Math.max(3, Math.round(segments)), phiStart, Math.max(1e-6, phiLength))
+  geometry.computeVertexNormals()
+
+  const mesh      = new THREE.Mesh(geometry, material)
+  mesh.castShadow = true
+  return mesh
+}
+
+// perf: medium. One draw call. Profile point count × segments = vertex count —
+// keep the profile lean (8–16 points is plenty for most silhouettes).

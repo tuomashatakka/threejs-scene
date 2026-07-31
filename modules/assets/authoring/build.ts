@@ -1,4 +1,4 @@
-// modules/authoring/build.ts
+// modules/assets/authoring/build.ts
 // Spec in, Prop out.
 //
 // The compiler is deliberately dull: no interpretation, no cleverness, no
@@ -13,14 +13,15 @@
 
 import * as THREE from 'three'
 
-import { Prop, createStandardMaterial } from '../assets/index.js'
+import { createStandardMaterial } from '../materials.js'
+import { Prop } from '../prop.js'
 
 import { FLAT_SHAPES } from './spec.js'
 import { buildShape } from './shapes.js'
 import { resolvePlacements } from './layout.js'
 import { validatePropSpec } from './validate.js'
 
-import type { MaterialPreset } from '../assets/index.js'
+import type { MaterialPreset } from '../materials.js'
 import type { NormalizedPart, NormalizedPropSpec, PropSpec } from './spec.js'
 import type { SpecReview } from './validate.js'
 

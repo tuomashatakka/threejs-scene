@@ -8,6 +8,7 @@ import * as THREE from 'three'
 
 import { Prop } from './prop.js'
 import { createStandardMaterial } from './materials.js'
+import { createRockGeometry } from './geometry/rock.js'
 
 import type { SeededRng } from '../../lib/index.js'
 
@@ -75,30 +76,7 @@ export interface RockOptions extends PropOptions {
  * @returns A {@link Prop} with a single part `body`.
  */
 export function rockProp ({ rng, scale = 1, color = '#7c776e' }: RockOptions = {}): Prop {
-  const geometry = new THREE.IcosahedronGeometry(0.5, 1)
-  const position = geometry.attributes.position as THREE.BufferAttribute
-  const vertex   = new THREE.Vector3()
-
-  // A per-rock phase so seeded rocks each differ, fed through a hash of the
-  // vertex POSITION rather than the rng sequence. Icosahedron geometry is
-  // non-indexed — every corner is duplicated across the faces that meet there —
-  // so displacing by the rng sequence moves those duplicates apart and tears
-  // the shell into gaps (the reason the old rocks read as shattered blobs, not
-  // stones). Hashing the position instead moves coincident corners together,
-  // keeping the boulder watertight.
-  const phase = rng ? rng.range(0, 100) : 0
-
-  for (let i = 0; i < position.count; i++) {
-    vertex.fromBufferAttribute(position, i)
-
-    const h    = Math.sin((vertex.x * 12.9898 + vertex.y * 78.233 + vertex.z * 37.719 + phase) * 43758.5453)
-    const bump = h - Math.floor(h) // 0..1, identical for coincident corners
-    vertex.multiplyScalar(0.82 + bump * 0.46) // lumpy, but a closed surface
-    vertex.y *= 0.68 // squat: a boulder sits wider than it stands tall
-    position.setXYZ(i, vertex.x, vertex.y, vertex.z)
-  }
-  position.needsUpdate = true
-  geometry.computeVertexNormals()
+  const geometry = createRockGeometry({ radius: 0.5, rng, scale: [ 1, 0.68, 1 ]})
 
   const body         = new THREE.Mesh(geometry, createStandardMaterial('matte', { color, roughness: 0.94, flatShading: true }))
   body.castShadow    = true

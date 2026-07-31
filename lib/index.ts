@@ -21,7 +21,7 @@ export type { FrameLoopOptions } from './time/loop.js'
 
 // state — what the world is
 export { createStore } from './state/store.js'
-export { createSeededRng, mulberry32 } from './state/rng.js'
+export { createSeededRng, hash2, hash3, lerp, mulberry32, smoothstep } from './state/rng.js'
 export type { Store, Reducer, StoreListener } from './state/store.js'
 
 // camera — prebuilt rigs for createApp's `camera` option

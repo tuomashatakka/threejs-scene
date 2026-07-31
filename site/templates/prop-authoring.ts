@@ -1,7 +1,7 @@
 // LLM prop authoring
 // ------------------
 // A turntable of props that were never written as code. Every object on this
-// plinth came out of `modules/authoring`: a few lines of JSON — the dialect a
+// plinth came out of `modules/assets`: a few lines of JSON — the dialect a
 // small language model is asked to emit — compiled by `buildProp`, then
 // measured and critiqued by `reviewProp`.
 //
@@ -20,7 +20,7 @@ import * as THREE from 'three'
 import { createApp, defineModule } from 'threejs-scene'
 import { standardLighting } from 'threejs-scene/modules/lighting'
 import { createStandardMaterial } from 'threejs-scene/modules/assets'
-import { PROP_EXAMPLES, buildProp, reviewProp, tryBuildProp } from 'threejs-scene/modules/authoring'
+import { PROP_EXAMPLES, buildProp, reviewProp, tryBuildProp } from 'threejs-scene/modules/assets'
 
 import type { App, AppModule } from 'threejs-scene'
 import type { Prop } from 'threejs-scene/modules/assets'

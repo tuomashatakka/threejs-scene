@@ -55,6 +55,13 @@ export interface BodyOptions {
   /** Override the derived box size, in metres. */
   size?: Vec3
 
+  /**
+   * Override the collider centre in object-local coordinates. By default it is
+   * derived from all descendant mesh bounds. This is useful for invisible or
+   * deliberately asymmetric collision volumes.
+   */
+  center?: Vec3
+
   /** Override the derived radius (`sphere`, `cylinder`), in metres. */
   radius?: number
 
@@ -118,6 +125,16 @@ export interface PhysicsApi {
    */
   add (object: THREE.Object3D, options?: BodyOptions): CANNON.Body
 
+  /**
+   * Bind every direct child of a root, or every object in an array, as an
+   * independent body. Unlike {@link add}, this never creates one compound
+   * rigid body for a group.
+   */
+  addEach (
+    rootOrObjects: THREE.Object3D | readonly THREE.Object3D[],
+    optionsOrResolver?: BodyOptions | ((object: THREE.Object3D, index: number) => BodyOptions),
+  ): CANNON.Body[]
+
   /** Add a body with no visual counterpart — a wall, a trigger, a floor. */
   addBody (body: CANNON.Body): CANNON.Body
 
@@ -140,21 +157,74 @@ export interface PhysicsApi {
 export interface PhysicsHandle<S extends object = Record<string, unknown>> extends PhysicsApi, AppModule<S> {}
 
 interface Binding {
-  body:   CANNON.Body
-  object: THREE.Object3D
+  body:       CANNON.Body
+  object:     THREE.Object3D
+  center:     THREE.Vector3
+  worldScale: THREE.Vector3
+  kinematic:  boolean
 }
+
+interface DerivedBounds {
+  center:     THREE.Vector3
+  localSize:  THREE.Vector3
+  worldScale: THREE.Vector3
+}
+
+const _bounds           = new THREE.Box3()
+const _childBounds      = new THREE.Box3()
+const _inverseRoot      = new THREE.Matrix4()
+const _relativeMatrix   = new THREE.Matrix4()
+const _worldPosition    = new THREE.Vector3()
+const _worldQuaternion  = new THREE.Quaternion()
+const _parentQuaternion = new THREE.Quaternion()
+const _scaledCenter     = new THREE.Vector3()
+const _parentInverse    = new THREE.Matrix4()
 
 function toVec3 (value: Vec3): CANNON.Vec3 {
   return new CANNON.Vec3(value[0], value[1], value[2])
 }
 
+/** Bounds in root-local space, with the root's world scale frozen at binding. */
+function deriveBounds (object: THREE.Object3D, options: BodyOptions): DerivedBounds {
+  object.updateWorldMatrix(true, true)
+  _inverseRoot.copy(object.matrixWorld).invert()
+  _bounds.makeEmpty()
+
+  object.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.geometry)
+      return
+
+    if (!mesh.geometry.boundingBox)
+      mesh.geometry.computeBoundingBox()
+    if (!mesh.geometry.boundingBox || mesh.geometry.boundingBox.isEmpty())
+      return
+
+    _relativeMatrix.multiplyMatrices(_inverseRoot, child.matrixWorld)
+    _childBounds.copy(mesh.geometry.boundingBox).applyMatrix4(_relativeMatrix)
+    _bounds.union(_childBounds)
+  })
+
+  const center = options.center
+    ? new THREE.Vector3(options.center[0], options.center[1], options.center[2])
+    : _bounds.isEmpty() ? new THREE.Vector3() : _bounds.getCenter(new THREE.Vector3())
+  const localSize = options.size
+    ? new THREE.Vector3(options.size[0], options.size[1], options.size[2])
+    : _bounds.isEmpty() ? new THREE.Vector3(1, 1, 1) : _bounds.getSize(new THREE.Vector3())
+  const worldScale = object.getWorldScale(new THREE.Vector3())
+  worldScale.set(Math.abs(worldScale.x), Math.abs(worldScale.y), Math.abs(worldScale.z))
+
+  return { center, localSize, worldScale }
+}
+
 /** Fit a collision shape to what the object actually looks like. */
-function deriveShape (object: THREE.Object3D, options: BodyOptions): CANNON.Shape {
-  const box  = new THREE.Box3().setFromObject(object)
-  const size = box.isEmpty() ? new THREE.Vector3(1, 1, 1) : box.getSize(new THREE.Vector3())
-  const half = options.size
-    ? new CANNON.Vec3(options.size[0] / 2, options.size[1] / 2, options.size[2] / 2)
-    : new CANNON.Vec3(Math.max(size.x, 1e-3) / 2, Math.max(size.y, 1e-3) / 2, Math.max(size.z, 1e-3) / 2)
+function deriveShape ({ localSize, worldScale }: DerivedBounds, options: BodyOptions): CANNON.Shape {
+  const size = localSize.clone().multiply(worldScale)
+  const half = new CANNON.Vec3(
+    Math.max(size.x, 1e-3) / 2,
+    Math.max(size.y, 1e-3) / 2,
+    Math.max(size.z, 1e-3) / 2,
+  )
 
   const radius = options.radius ?? Math.max(half.x, half.z)
 
@@ -168,6 +238,42 @@ function deriveShape (object: THREE.Object3D, options: BodyOptions): CANNON.Shap
     default:
       return new CANNON.Box(half)
   }
+}
+
+function readObjectWorldPose (binding: Binding): void {
+  const { body, center, object, worldScale } = binding
+  object.updateWorldMatrix(true, false)
+  object.getWorldPosition(_worldPosition)
+  object.getWorldQuaternion(_worldQuaternion)
+  _scaledCenter.copy(center).multiply(worldScale)
+    .applyQuaternion(_worldQuaternion)
+  _worldPosition.add(_scaledCenter)
+  body.position.set(_worldPosition.x, _worldPosition.y, _worldPosition.z)
+  body.quaternion.set(_worldQuaternion.x, _worldQuaternion.y, _worldQuaternion.z, _worldQuaternion.w)
+  body.aabbNeedsUpdate = true
+}
+
+function writeBodyWorldPose (binding: Binding): void {
+  const { body, center, object, worldScale } = binding
+  _worldQuaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w)
+  _scaledCenter.copy(center).multiply(worldScale)
+    .applyQuaternion(_worldQuaternion)
+  _worldPosition.set(body.position.x, body.position.y, body.position.z).sub(_scaledCenter)
+
+  if (object.parent) {
+    object.parent.updateWorldMatrix(true, false)
+    _parentInverse.copy(object.parent.matrixWorld).invert()
+    object.position.copy(_worldPosition).applyMatrix4(_parentInverse)
+    object.parent.getWorldQuaternion(_parentQuaternion).invert()
+    object.quaternion.copy(_parentQuaternion.multiply(_worldQuaternion))
+  }
+  else {
+    object.position.copy(_worldPosition)
+    object.quaternion.copy(_worldQuaternion)
+  }
+
+  object.updateMatrix()
+  object.updateMatrixWorld(true)
 }
 
 /**
@@ -195,11 +301,13 @@ export function physicsWorld<S extends object = Record<string, unknown>> ({
   world.broadphase  = new CANNON.SAPBroadphase(world)
   solver.iterations = iterations
 
-  // One shared surface for everything, so a body's friction and bounce are
-  // defined against SOMETHING. cannon only reads friction from a ContactMaterial
-  // registered for the colliding PAIR — per-body `material.friction` alone is
-  // silently ignored, which is the engine's most common gotcha.
-  const surface                            = new CANNON.Material('default')
+  // cannon multiplies the two bodies' material coefficients when both are
+  // present. Static surfaces therefore use neutral coefficients: the authored
+  // value on the moving body survives contact unchanged.
+  const surface                            = new CANNON.Material({ friction: 1, restitution: 1 })
+  const defaults                           = new CANNON.Material({ friction: 0.4, restitution: 0.2 })
+  surface.name                             = 'surface'
+  defaults.name                            = 'body-default'
   world.defaultContactMaterial.friction    = 0.4
   world.defaultContactMaterial.restitution = 0.15
 
@@ -209,6 +317,10 @@ export function physicsWorld<S extends object = Record<string, unknown>> ({
   let accumulator = 0
 
   const advance = (): void => {
+    for (const binding of bindings)
+      if (binding.kinematic)
+        readObjectWorldPose(binding)
+
     for (const callback of before)
       callback(step)
 
@@ -217,22 +329,54 @@ export function physicsWorld<S extends object = Record<string, unknown>> ({
     // machine is. The accumulator above owns the pacing instead.
     world.step(step)
 
+    for (const binding of bindings)
+      if (!binding.kinematic)
+        writeBodyWorldPose(binding)
+
     for (const callback of after)
       callback(step)
   }
 
-  // A body with custom friction/bounce needs a ContactMaterial against the
-  // shared surface; without one, cannon falls back to the world default.
-  const surfaceFor = (options: BodyOptions): CANNON.Material => {
+  const materialFor = (options: BodyOptions, staticBody: boolean): CANNON.Material => {
     if (options.friction === undefined && options.restitution === undefined)
-      return surface
+      return staticBody ? surface : defaults
 
-    const material = new CANNON.Material()
-    world.addContactMaterial(new CANNON.ContactMaterial(material, surface, {
-      friction:    options.friction ?? 0.4,
-      restitution: options.restitution ?? 0.2,
-    }))
-    return material
+    return new CANNON.Material({
+      friction:    Math.max(0, options.friction ?? 0.4),
+      restitution: THREE.MathUtils.clamp(options.restitution ?? 0.2, 0, 1),
+    })
+  }
+
+  const add = (object: THREE.Object3D, options: BodyOptions = {}): CANNON.Body => {
+    const bounds     = deriveBounds(object, options)
+    const staticBody = !options.kinematic && (options.mass ?? 0) === 0
+    const body       = new CANNON.Body({
+      mass:           options.kinematic ? 0 : options.mass ?? 0,
+      shape:          deriveShape(bounds, options),
+      material:       materialFor(options, staticBody),
+      linearDamping:  THREE.MathUtils.clamp(options.linearDamping ?? 0.01, 0, 1),
+      angularDamping: THREE.MathUtils.clamp(options.angularDamping ?? 0.01, 0, 1),
+    })
+    if (options.kinematic)
+      body.type = CANNON.Body.KINEMATIC
+
+    const binding: Binding = {
+      body,
+      object,
+      center:     bounds.center,
+      worldScale: bounds.worldScale,
+      kinematic:  options.kinematic === true,
+    }
+    readObjectWorldPose(binding)
+
+    if (options.velocity)
+      body.velocity.copy(toVec3(options.velocity))
+    if (options.angularVelocity)
+      body.angularVelocity.copy(toVec3(options.angularVelocity))
+
+    world.addBody(body)
+    bindings.push(binding)
+    return body
   }
 
   return {
@@ -255,38 +399,24 @@ export function physicsWorld<S extends object = Record<string, unknown>> ({
         accumulator -= step
         steps++
       }
-
-      for (const { body, object } of bindings) {
-        object.position.set(body.position.x, body.position.y, body.position.z)
-        object.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w)
-      }
     },
 
-    add (object, options = {}) {
-      const body = new CANNON.Body({
-        mass:           options.kinematic ? 0 : options.mass ?? 0,
-        shape:          deriveShape(object, options),
-        material:       surfaceFor(options),
-        linearDamping:  options.linearDamping ?? 0.01,
-        angularDamping: options.angularDamping ?? 0.01,
-      })
-      if (options.kinematic)
-        body.type = CANNON.Body.KINEMATIC
+    add,
 
-      body.position.set(object.position.x, object.position.y, object.position.z)
-      body.quaternion.set(object.quaternion.x, object.quaternion.y, object.quaternion.z, object.quaternion.w)
+    addEach (rootOrObjects, optionsOrResolver = {}) {
+      const objects = rootOrObjects instanceof THREE.Object3D
+        ? rootOrObjects.children.length > 0 ? [ ...rootOrObjects.children ] : [ rootOrObjects ]
+        : rootOrObjects
 
-      if (options.velocity)
-        body.velocity.copy(toVec3(options.velocity))
-      if (options.angularVelocity)
-        body.angularVelocity.copy(toVec3(options.angularVelocity))
-
-      world.addBody(body)
-      bindings.push({ body, object })
-      return body
+      return objects.map((object, index) => add(
+        object,
+        typeof optionsOrResolver === 'function' ? optionsOrResolver(object, index) : optionsOrResolver,
+      ))
     },
 
     addBody (body) {
+      if (!body.material)
+        body.material = body.mass === 0 ? surface : defaults
       world.addBody(body)
       return body
     },

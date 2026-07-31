@@ -87,8 +87,8 @@ Every effect's parameters are adjustable live in the
 
 ## Starter templates
 
-Five scaffolded apps — an isometric tilt-shift endless scape, a third-person
-hovership racer, a studio product display, a gallery of props compiled from
+Seven scaffolded apps — two isometric scenes, a third-person hovership racer,
+a studio product display, the complete asset gallery, props compiled from
 LLM-authored JSON, and a physics yard — are on the
 [starters page](https://tuomashatakka.github.io/threejs-scene/starters.html),
 each showing its complete source beside the running scene. The source is
@@ -109,13 +109,15 @@ Each one is a worked example of tying a camera to something else in the scene:
 - **Product** — the camera revolves around a product that never moves (so the
   key light rakes across it, which spinning the object cannot fake), and the
   pointer leans the rig a few degrees for parallax.
+- **Asset gallery** — built directly from `ASSET_MANIFEST`: all five textures,
+  twelve materials, and twenty-two prop presets, labelled through one atlas.
 - **LLM prop authoring** — every object on the plinth was JSON a moment ago,
-  compiled by `modules/authoring`. Two of them came from deliberately sloppy
+  compiled by `modules/assets`. Two of them came from deliberately sloppy
   model output; the console prints what each prop's critique would tell the
   model back.
 - **Salvage yard physics** — cloth, liquid and kinetics in one deterministic
-  world: a tarp breathing in the wind, SPH fluid sloshing in a basin, barrels
-  coming down a ramp, on scenery placed by the keep-out solver.
+  world: a tarp breathing in the wind, a cohesive fluid surface sloshing in a
+  cutaway basin, and independent barrels/crates coming down a ramp.
 
 ## Content: props, materials, textures
 
@@ -137,11 +139,30 @@ everything it contains **unless** the resource is tagged with `markShared()`.
 That makes sharing a pooled material a deliberate, visible act, and keeps
 `dispose()` safe to call without blanking a neighbour's material.
 
-Also here: `MATERIAL_PRESETS` (`metal`, `chrome`, `gold`, `plastic`, `rubber`,
-`glass`, `matte`, `emissive`), `createToonMaterial`, seeded DOM-free procedural
-textures (`createGridTexture`, `createNoiseTexture`, `createGradientTexture`),
-and a starter prop catalogue (`crystalProp`, `rockProp`, `treeProp`,
-`lampPostProp`).
+The primary interface is synchronous and deliberately model-friendly:
+
+```ts
+import { createProp, tryCreateProp, ASSET_MANIFEST } from 'threejs-scene/modules/assets'
+
+const barrel = createProp('barrel', { scale: 1.2 })
+const crate  = createProp({ preset: 'crate', options: { seed: 7 } })
+const custom = tryCreateProp(modelProducedJsonOrProse) // never throws
+
+scene.add(barrel, crate)
+if (custom.prop) scene.add(custom.prop)
+```
+
+Exact preset strings resolve first. Other strings go through forgiving JSON
+extraction and validation. Preset options are described by exported parameter
+specs: malformed values default/clamp and unknown keys are ignored.
+`CREATE_PROP_SCHEMA` is the function-calling schema; `ASSET_MANIFEST` is a
+JSON-serializable inventory of every option default, description, and tag.
+
+Also here: eight PBR presets plus toon, procedural matcap, holographic, and
+triplanar materials; five DOM-free procedural textures; shape profiles,
+extrusion/lathe/path tubes, twist/taper/bend/noise and topology modifiers,
+merging/layout/bounds/connection/infinite-ground helpers; owned prop registries,
+composites, and single- or multi-part instancing.
 
 ### The low-poly prop kit
 
@@ -152,7 +173,7 @@ bake the look into the vertices, collapse a prop into one geometry, and stamp it
 import {
   part, mergeParts,          // primitives → one merged, vertex-coloured geometry
   bakeFacetColors, applyGrime, kitMaterial,
-  buildKitGeometry, kitProp, // 14 ready-made wasteland props
+  buildKitGeometry, kitProp, // 16 ready-made wasteland props
   createPlacementField, scatterInstances,
 } from 'threejs-scene/modules/assets'
 
@@ -173,7 +194,8 @@ one geometry per prop *type*, which is the only form that can be instanced.
 
 The kit: `ruined-block`, `crumbled-building`, `container`, `crate-stack`,
 `watchtower`, `pylon`, `wreck-car`, `dead-tree`, `barrel-cluster`, `rubble-pile`,
-`barricade`, `tire-stack`, `road-sign`, `crag` — each seeded, so
+`barricade`, `tire-stack`, `road-sign`, `crag`, plus atomic `barrel` and `crate`
+— each seeded, so
 `buildKitGeometry('crag')` is the same crag every time and
 `buildKitGeometry('crag', { rng })` is a different one each call.
 
@@ -199,12 +221,12 @@ identical geometry does not read as identical objects.
 
 ## Props from language models
 
-`modules/authoring` lets a **small** model author props. Not by writing
+`modules/assets` lets a **small** model author props. Not by writing
 three.js — by filling in a tiny JSON dialect that is validated, compiled, and
 then critiqued, so the model can fix its own mistakes:
 
 ```ts
-import { createPropTool, generateProp, buildProp } from 'threejs-scene/modules/authoring'
+import { createPropTool, generateProp, buildProp } from 'threejs-scene/modules/assets'
 
 scene.add(buildProp({
   name:  'crate',
@@ -245,11 +267,11 @@ import {
   buildProp,          // spec → Prop, deterministic, one geometry per part
   reviewProp,         // measures the BUILT prop: floats? detached? buried? too heavy?
   propAuthoringPrompt // the grammar + worked examples, ~2.8k chars (or 1.4k compact)
-} from 'threejs-scene/modules/authoring'
+} from 'threejs-scene/modules/assets'
 ```
 
 `createPropTool()` packages them as a provider-agnostic tool definition — a
-name, a description, a JSON Schema (`PROP_SPEC_SCHEMA`), and a `run` that never
+name, a description, a JSON Schema (`CREATE_PROP_SCHEMA`), and a `run` that never
 throws — so it drops into Anthropic `input_schema`, OpenAI/Gemini `parameters`,
 an ai-sdk tool, or a constrained decoder for a local model.
 
@@ -292,29 +314,35 @@ const physics = physicsWorld({ gravity: [ 0, -9.82, 0 ], iterations: 16 })
 const app     = createApp(canvas, { use: [ standardLighting(), physics ] })
 
 addGroundPlane(physics)
-physics.add(crate, { mass: 8, friction: 0.85 })     // bind any Object3D to a body
+physics.add(crate, { mass: 8, friction: 0.85 })      // one compound rigid body
+physics.addEach(crateGroup, { mass: 5 })             // direct children move independently
 
 const tarp = createCloth(physics, {                  // cloth
   size: [ 4, 2.6 ], segments: 14, mass: 2.4,
   at: [ -2, 3.3, -1.6 ], pin: 'top-edge', wind: [ 0, 0, 4 ],
 })
-const pool = createLiquid(physics, {                 // liquid (SPH)
-  count: 260, at: [ 4.2, 2.2, 0 ], spawn: [ 1.6, 1.1, 1.6 ], viscosity: 0.05, rng,
+const pool = createLiquid(physics, {                 // position-based liquid
+  count: 320, at: [ 4.2, 2.2, 0 ], spawn: [ 1.6, 1.1, 1.6 ],
+  neighborRadius: 0.24, iterations: 4, viscosity: 0.02, cohesion: 0.01, rng,
 })
 scene.add(tarp.mesh, pool.mesh)
 ```
 
 - **Rigid / kinetic** — `physics.add(object, { mass, shape, friction, restitution })`
-  binds an `Object3D` to a body and drives its transform. `shape: 'auto'` fits a
-  box to the object's own bounding box.
+  binds an `Object3D` as one body; `addEach()` binds direct children separately.
+  Descendant bounds are measured in object-local space, the body is placed at
+  their transformed centre, and `center` can override it. Parent transforms,
+  base pivots, rotation, and bind-time scale remain aligned.
 - **Cloth** — a grid of cannon particles held by distance constraints, in the
   *same* solver as everything else, so a barrel dropped on the tarp moves it and
   the tarp pushes back. `wind` is an acceleration in m/s², so behaviour does not
   change when you change the sheet's mass or resolution.
-- **Liquid** — cannon's `SPHSystem`: each drop samples its neighbours for density
-  and gets pressure and viscosity forces back. It sloshes and finds its own level
-  because that is what the solver does, not because anything animates it. Drawn
-  as one instanced draw call.
+- **Liquid** — cannon spheres handle gravity and rigid obstacles while a
+  spatial-hashed position-based solver performs four local density passes,
+  artificial pressure, cohesion, and XSPH viscosity. Rest density calibrates
+  from the spawn lattice. A live `MarchingCubes` surface is the default;
+  `renderMode: 'particles'` is the low-power/debug alternative. Tune through
+  `liquid.solver`; reset and disposal remain explicit.
 
 The world is stepped at a **fixed** rate with an accumulator regardless of frame
 rate, so the same start replays to the same pile — the determinism the rest of
@@ -371,7 +399,8 @@ rest of the setup.
 
 Every entry in `modules/` is a folder with an `index.ts` — `lighting/`,
 `orbit/`, `post/` (the post-processing module, its passes, `shared/` GLSL, and
-the `webgl/` catalogue), and `assets/` (props, materials, textures). They use
+the `webgl/` catalogue), `assets/` (all procedural content and model authoring),
+and optional `physics/`. They use
 only the public surface.
 
 `site/` is the Vite-built public site: a landing page, one interactive page that
@@ -386,9 +415,10 @@ cap applies page-globally.
 ## Next.js and other SSR frameworks
 
 Every entry ships both ESM and CommonJS, so `require('threejs-scene')` resolves
-from a server bundle. That makes the package importable anywhere; it does not
-make it *renderable* anywhere. Everything here touches `window`, `document`, and
-`WebGLRenderer`, so it must run client-side only:
+from a server bundle. The procedural factories, manifest, validation, review,
+and prop compiler in `modules/assets` are DOM-free and work headlessly. Creating
+an app renderer or mounting one of the browser starters still touches `window`,
+`document`, and `WebGLRenderer`, so that rendering layer must run client-side:
 
 ```tsx
 // app/scene.tsx
@@ -404,11 +434,11 @@ const Scene = dynamic(() => import('./scene'), { ssr: false })
 resolution was missing.
 
 One caveat worth knowing before you `require()`: `three/addons/*` is ESM-only
-upstream (no `require` condition), and `modules/post`, `modules/post/webgl`, and
-`modules/lighting` import from it. Under `require()` those three need Node
-≥22.12 (where `require(esm)` landed) or a bundler. The root entry,
-`modules/orbit`, and `modules/assets` are addon-free and `require()` cleanly
-anywhere.
+upstream (no `require` condition), and `modules/post`, `modules/post/webgl`,
+`modules/lighting`, and the geometry surface of `modules/assets` import from it.
+Under `require()` those entries need Node ≥22.12 (where `require(esm)` landed)
+or a bundler. The root entry and `modules/orbit` remain addon-free and
+`require()` cleanly anywhere.
 
 Don't mix `import` and `require` of this package in one process — you get two
 copies of every module, so class identity and `instanceof` stop agreeing.

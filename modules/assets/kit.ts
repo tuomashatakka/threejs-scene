@@ -17,6 +17,7 @@ import { createSeededRng } from '../../lib/index.js'
 import { Prop, markShared } from './prop.js'
 import { kitMaterial } from './facets.js'
 import { mergeParts, part } from './parts.js'
+import { createRockGeometry } from './geometry/rock.js'
 
 import type { SeededRng, Vec3 } from '../../lib/index.js'
 
@@ -69,6 +70,8 @@ export const KIT_PROP_NAMES = [
   'tire-stack',
   'road-sign',
   'crag',
+  'barrel',
+  'crate',
 ] as const
 
 /** Name of a prop in {@link KIT_PROP_NAMES}. */
@@ -98,10 +101,10 @@ interface BuildContext {
   spin:   () => Vec3
 }
 
-const box   = (w: number, h: number, d: number): THREE.BufferGeometry => new THREE.BoxGeometry(w, h, d)
-const cyl   = (rt: number, rb: number, h: number, sides: number): THREE.BufferGeometry => new THREE.CylinderGeometry(rt, rb, h, sides)
-const cone  = (r: number, h: number, sides: number): THREE.BufferGeometry => new THREE.ConeGeometry(r, h, sides)
-const tetra = (r: number): THREE.BufferGeometry => new THREE.TetrahedronGeometry(r)
+const box  = (w: number, h: number, d: number): THREE.BufferGeometry => new THREE.BoxGeometry(w, h, d)
+const cyl  = (rt: number, rb: number, h: number, sides: number): THREE.BufferGeometry => new THREE.CylinderGeometry(rt, rb, h, sides)
+const cone = (r: number, h: number, sides: number): THREE.BufferGeometry => new THREE.ConeGeometry(r, h, sides)
+const rock = (radius: number, rng: SeededRng): THREE.BufferGeometry => createRockGeometry({ radius, detail: 1, rng, roughness: 0.3 })
 
 // ── the builders ─────────────────────────────────────────────────────────────
 
@@ -116,7 +119,7 @@ function ruinedBlock ({ rng, colors, range, pick, spin }: BuildContext): THREE.B
   ]
 
   for (let i = 0; i < 3; i++)
-    parts.push(part(tetra(range(0.22, 0.4)), {
+    parts.push(part(rock(range(0.22, 0.4), rng), {
       at:     [ range(-1.4, 1.4), range(1.2, 2.5), pick([ 1.15, -1.15 ]) + range(-0.1, 0.1) ],
       rotate: spin(),
       color:  colors.concrete,
@@ -135,7 +138,7 @@ function ruinedBlock ({ rng, colors, range, pick, spin }: BuildContext): THREE.B
     }))
 
   for (let i = 0; i < 4; i++)
-    parts.push(part(pick([ tetra(range(0.18, 0.32)), box(range(0.2, 0.45), 0.2, range(0.2, 0.4)) ]), {
+    parts.push(part(pick([ rock(range(0.18, 0.32), rng), box(range(0.2, 0.45), 0.2, range(0.2, 0.4)) ]), {
       at:     [ range(-2, 2), 0.1, range(-1.6, 1.6) ],
       rotate: [ 0, rng.next() * 3, 0 ],
       color:  colors.concreteWorn,
@@ -164,7 +167,7 @@ function crumbledBuilding ({ rng, colors, range, pick, spin }: BuildContext): TH
       parts.push(part(box(0.1, 0.75, 0.6), { at: [ 2.1, y, z ], color: colors.glass, jitter: 0.04, rng }))
 
   for (let i = 0; i < 7; i++)
-    parts.push(part(pick([ tetra(range(0.28, 0.55)), box(range(0.35, 0.7), range(0.22, 0.42), range(0.3, 0.6)) ]), {
+    parts.push(part(pick([ rock(range(0.28, 0.55), rng), box(range(0.35, 0.7), range(0.22, 0.42), range(0.3, 0.6)) ]), {
       at:     [ range(-2.6, -0.8), range(0.08, 0.5), range(-1.6, 1.6) ],
       rotate: spin(),
       color:  pick([ colors.concrete, colors.interior, colors.concreteDark ]),
@@ -327,12 +330,33 @@ function barrelCluster ({ rng, colors }: BuildContext): THREE.BufferGeometry {
   return mergeParts(parts, { grime: 1.0 })
 }
 
+/** One physics-ready drum with its base at y = 0. */
+function barrel ({ rng, colors }: BuildContext): THREE.BufferGeometry {
+  return mergeParts([
+    part(cyl(0.4, 0.4, 0.95, 10), { at: [ 0, 0.475, 0 ], color: colors.toxic, jitter: 0.065, rng }),
+    part(cyl(0.425, 0.425, 0.045, 10), { at: [ 0, 0.18, 0 ], color: colors.steelDark, jitter: 0.04, rng }),
+    part(cyl(0.425, 0.425, 0.045, 10), { at: [ 0, 0.77, 0 ], color: colors.steelDark, jitter: 0.04, rng }),
+  ], { grime: 0.9 })
+}
+
+/** One physics-ready timber crate with its base at y = 0. */
+function crate ({ rng, colors }: BuildContext): THREE.BufferGeometry {
+  const parts = [
+    part(box(0.82, 0.78, 0.82), { at: [ 0, 0.39, 0 ], color: colors.wood, jitter: 0.09, rng }),
+  ]
+  for (const y of [ 0.08, 0.7 ])
+    parts.push(part(box(0.88, 0.08, 0.88), { at: [ 0, y, 0 ], color: colors.woodDark, jitter: 0.07, rng }))
+  for (const x of [ -0.37, 0.37 ])
+    parts.push(part(box(0.07, 0.62, 0.87), { at: [ x, 0.39, 0 ], color: colors.woodLight, jitter: 0.08, rng }))
+  return mergeParts(parts, { grime: 0.85 })
+}
+
 /** A heap of broken concrete with one bent bar through it. */
 function rubblePile ({ rng, colors, range, pick, spin }: BuildContext): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
 
   for (let i = 0; i < 6; i++)
-    parts.push(part(pick([ tetra(range(0.25, 0.55)), box(range(0.3, 0.6), range(0.2, 0.4), range(0.3, 0.55)) ]), {
+    parts.push(part(pick([ rock(range(0.25, 0.55), rng), box(range(0.3, 0.6), range(0.2, 0.4), range(0.3, 0.55)) ]), {
       at:     [ range(-0.7, 0.7), range(0.08, 0.3), range(-0.7, 0.7) ],
       rotate: spin(),
       color:  pick([ colors.concrete, colors.concreteWorn, colors.concreteDark ]),
@@ -396,7 +420,7 @@ function crag ({ rng, colors, range, pick, spin }: BuildContext): THREE.BufferGe
   const parts: THREE.BufferGeometry[] = []
 
   for (let i = 0; i < 6; i++)
-    parts.push(part(tetra(range(1.6, 3.2)), {
+    parts.push(part(rock(range(1.6, 3.2), rng), {
       at:     [ range(-1.8, 1.8), range(0.4, 2.6), range(-1.8, 1.8) ],
       rotate: spin(),
       scale:  [ 1, range(1.1, 1.9), 1 ],
@@ -431,6 +455,8 @@ const BUILDERS: Record<KitPropName, (ctx: BuildContext) => THREE.BufferGeometry>
   'tire-stack':        tireStack,
   'road-sign':         roadSign,
   crag,
+  barrel,
+  crate,
 }
 
 // A stable seed per prop name, so an unseeded build is reproducible AND the

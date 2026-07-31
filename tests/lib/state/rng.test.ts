@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createSeededRng, mulberry32 } from 'Δ/state/rng'
+import { createSeededRng, hash2, hash3, lerp, mulberry32, smoothstep } from 'Δ/state/rng'
 
 
 describe('mulberry32', () => {
@@ -62,5 +62,23 @@ describe('createSeededRng', () => {
     const b    = createSeededRng(2)
     const same = Array.from({ length: 10 }, () => a.next() === b.next())
     expect(same).toContain(false)
+  })
+})
+
+describe('stateless rng math', () => {
+  it('hashes coordinates deterministically into [0, 1)', () => {
+    expect(hash2(3, 7)).toBe(hash2(3, 7))
+    expect(hash3(3, 7, 11)).toBe(hash3(3, 7, 11))
+    expect(hash2(3, 7)).toBeGreaterThanOrEqual(0)
+    expect(hash2(3, 7)).toBeLessThan(1)
+    expect(hash3(3, 7, 11)).not.toBe(hash3(3, 7, 12))
+  })
+
+  it('interpolates and smoothsteps, including equal edges', () => {
+    expect(lerp(2, 6, 0.25)).toBe(3)
+    expect(smoothstep(0, 1, 0)).toBe(0)
+    expect(smoothstep(0, 1, 1)).toBe(1)
+    expect(smoothstep(2, 2, 1)).toBe(0)
+    expect(smoothstep(2, 2, 3)).toBe(1)
   })
 })

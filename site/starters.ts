@@ -15,6 +15,7 @@ import { mount as mountHovership } from './templates/hovership'
 import { mount as mountProduct } from './templates/product'
 import { mount as mountPropAuthoring } from './templates/prop-authoring'
 import { mount as mountPhysics } from './templates/physics'
+import { mount as mountAssets } from './templates/assets'
 
 import isometricSource from './templates/isometric.ts?raw'
 import isometricSqrSource from './templates/isometric-sqr.ts?raw'
@@ -22,6 +23,7 @@ import hovershipSource from './templates/hovership.ts?raw'
 import productSource from './templates/product.ts?raw'
 import propAuthoringSource from './templates/prop-authoring.ts?raw'
 import physicsSource from './templates/physics.ts?raw'
+import assetsSource from './templates/assets.ts?raw'
 
 import { attachCollapse } from './collapse'
 
@@ -67,9 +69,17 @@ const STARTERS: Starter[] = [
     mount:  asStarterMount(mountHovership as never),
   },
   {
+    id:     'assets',
+    title:  'Asset gallery',
+    blurb:  'The complete executable asset manifest: five procedural textures, twelve materials, and all twenty-two prop presets, with one atlas-backed label mesh and no duplicated preset list.',
+    file:   'templates/assets.ts',
+    source: assetsSource,
+    mount:  asStarterMount(mountAssets as never),
+  },
+  {
     id:     'physics',
     title:  'Salvage yard physics',
-    blurb:  'Cloth, liquid and kinetics in one deterministic world: a tarp breathing in the wind, SPH fluid sloshing in a basin, and barrels coming down a ramp — all stepped by the same fixed clock, on scenery placed by the keep-out solver.',
+    blurb:  'Cloth, cohesive position-based liquid, and independently falling atomic props in one deterministic fixed-step world.',
     file:   'templates/physics.ts',
     source: physicsSource,
     mount:  asStarterMount(mountPhysics as never),
@@ -159,8 +169,14 @@ function select (starter: Starter): void {
   current   = null
   currentId = starter.id
 
-  for (const button of tabs!.querySelectorAll('button'))
-    button.setAttribute('aria-current', String(button.dataset.id === starter.id))
+  let selectedButton: HTMLButtonElement | null = null
+  for (const button of tabs!.querySelectorAll('button')) {
+    const selected = button.dataset.id === starter.id
+    button.setAttribute('aria-current', String(selected))
+    if (selected)
+      selectedButton = button
+  }
+  selectedButton?.scrollIntoView({ block: 'nearest', inline: 'center' })
 
   titleEl!.textContent = starter.title
   blurbEl!.textContent = starter.blurb
@@ -200,10 +216,11 @@ const sourcePane   = document.querySelector<HTMLElement>('[data-source]')
 const sourceToggle = document.querySelector<HTMLButtonElement>('[data-source] [data-collapse]')
 if (sourcePane && sourceToggle)
   attachCollapse({
-    panel:      sourcePane,
-    button:     sourceToggle,
-    storageKey: 'threejs-scene:source-collapsed',
-    labels:     { open: 'Hide source', closed: 'Show source' },
+    panel:            sourcePane,
+    button:           sourceToggle,
+    storageKey:       'threejs-scene:source-collapsed',
+    labels:           { open: 'Hide source', closed: 'Show source' },
+    defaultCollapsed: matchMedia('(max-width: 37.5rem)').matches,
   })
 
 // deep-link support: /starters.html#hovership opens that template

@@ -27,6 +27,9 @@ interface CollapseOptions {
 
   /** Accessible name when open / closed. */
   labels: { open: string, closed: string }
+
+  /** State used only when this browser has no remembered choice. */
+  defaultCollapsed?: boolean
 }
 
 /**
@@ -35,7 +38,7 @@ interface CollapseOptions {
  * @returns A detach function that removes the listener — call it from the
  * page's teardown so HMR reloads do not stack handlers.
  */
-export function attachCollapse ({ panel, button, storageKey, labels }: CollapseOptions): () => void {
+export function attachCollapse ({ panel, button, storageKey, labels, defaultCollapsed = false }: CollapseOptions): () => void {
   // A missing/blocked localStorage (private mode, embedded frame) must not take
   // the page down with it — the panel simply forgets between reloads.
   const remember = (collapsed: boolean): void => {
@@ -47,10 +50,11 @@ export function attachCollapse ({ panel, button, storageKey, labels }: CollapseO
 
   const recall = (): boolean => {
     try {
-      return localStorage.getItem(storageKey) === '1'
+      const remembered = localStorage.getItem(storageKey)
+      return remembered === null ? defaultCollapsed : remembered === '1'
     }
     catch {
-      return false
+      return defaultCollapsed
     }
   }
 

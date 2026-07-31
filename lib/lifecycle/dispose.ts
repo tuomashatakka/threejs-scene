@@ -20,11 +20,13 @@ function isTexture (val: unknown): val is THREE.Texture {
  * finally the material itself.
  */
 export function disposeMaterial (mat: THREE.Material): void {
+  const textures = new Set<THREE.Texture>()
+
   // dispose every Texture-shaped property
   for (const key in mat) {
     const val = (mat as unknown as Record<string, unknown>)[key]
     if (isTexture(val))
-      val.dispose()
+      textures.add(val)
   }
 
   // dispose every uniform whose value is a Texture
@@ -33,8 +35,13 @@ export function disposeMaterial (mat: THREE.Material): void {
     for (const key in shaderMat.uniforms) {
       const val = shaderMat.uniforms[key]?.value
       if (isTexture(val))
-        val.dispose()
+        textures.add(val)
     }
+
+  for (const texture of textures)
+    if (texture.userData.shared !== true)
+      texture.dispose()
+
   mat.dispose()
 }
 

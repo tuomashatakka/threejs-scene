@@ -1,4 +1,4 @@
-// modules/authoring/shapes.ts
+// modules/assets/authoring/shapes.ts
 // The shape vocabulary, compiled.
 //
 // Every builder returns geometry that EXACTLY fills the requested `size` box and

@@ -1,7 +1,7 @@
 {
   "name": "threejs-scene",
-  "version": "0.3.0",
-  "description": "Lightweight imperative three.js app shell: createApp + a small module contract. Deterministic clock, seeded rng, unidirectional state flow, strict dispose chain.",
+  "version": "0.4.0",
+  "description": "Deterministic imperative three.js scenes with an LLM-first procedural asset toolkit, fixed-step physics, and explicit disposal.",
   "type": "module",
   "main": "./dist/cjs/lib/index.js",
   "types": "./dist/lib/index.d.ts",
@@ -54,16 +54,6 @@
       "require": {
         "types": "./dist/cjs/modules/assets/index.d.ts",
         "default": "./dist/cjs/modules/assets/index.js"
-      }
-    },
-    "./modules/authoring": {
-      "import": {
-        "types": "./dist/modules/authoring/index.d.ts",
-        "default": "./dist/modules/authoring/index.js"
-      },
-      "require": {
-        "types": "./dist/cjs/modules/authoring/index.d.ts",
-        "default": "./dist/cjs/modules/authoring/index.js"
       }
     },
     "./modules/physics": {

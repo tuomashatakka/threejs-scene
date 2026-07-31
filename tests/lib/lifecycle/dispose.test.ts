@@ -28,6 +28,24 @@ describe('disposeMaterial', () => {
     disposeMaterial(mat)
     expect(spy).toHaveBeenCalled()
   })
+
+  it('deduplicates textures and preserves shared ones', () => {
+    const owned            = makeTexture()
+    const shared           = makeTexture()
+    shared.userData.shared = true
+
+    const mat              = new THREE.ShaderMaterial({
+      uniforms: { owned: { value: owned }, repeated: { value: owned }, shared: { value: shared }},
+    })
+    mat.userData.map = owned
+
+    const ownedSpy  = vi.spyOn(owned, 'dispose')
+    const sharedSpy = vi.spyOn(shared, 'dispose')
+
+    disposeMaterial(mat)
+    expect(ownedSpy).toHaveBeenCalledOnce()
+    expect(sharedSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('disposeScene', () => {

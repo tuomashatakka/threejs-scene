@@ -1,4 +1,4 @@
-// modules/authoring/prompt.ts
+// modules/assets/authoring/prompt.ts
 // What you actually send to the model.
 //
 // A small model does not need the schema explained; it needs the three facts it

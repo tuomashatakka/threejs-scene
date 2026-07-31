@@ -1,4 +1,4 @@
-// modules/authoring/tool.ts
+// modules/assets/authoring/tool.ts
 // The tool surface, and the loop that makes a small model good at this.
 //
 // `createPropTool()` is provider-agnostic on purpose: it hands back a name, a
@@ -12,13 +12,14 @@
 // fixes it on the second turn. The loop is only worth writing once, so it lives
 // here rather than in every consumer.
 
-import { buildProp, tryBuildProp } from './build.js'
+import { tryCreateProp } from '../create.js'
+import { CREATE_PROP_SCHEMA } from '../catalog.js'
+import { buildProp } from './build.js'
 import { reviewProp } from './review.js'
-import { PROP_SPEC_SCHEMA } from './schema.js'
 import { propAuthoringPrompt, propRetryPrompt } from './prompt.js'
 import { validatePropSpec } from './validate.js'
 
-import type { Prop } from '../assets/index.js'
+import type { Prop } from '../prop.js'
 import type { NormalizedPropSpec } from './spec.js'
 import type { JsonSchema } from './schema.js'
 import type { PromptOptions } from './prompt.js'
@@ -34,6 +35,9 @@ export interface PropToolResult {
 
   /** The normalized spec, or `null` when validation failed. */
   spec: NormalizedPropSpec | null
+
+  /** Exact preset name when a preset was built, otherwise `null`. */
+  preset: string | null
 
   /** The built prop, or `null`. The caller owns it — `dispose()` it. */
   prop: Prop | null
@@ -99,22 +103,39 @@ export function createPropTool ({ name = 'create_prop', review = true }: CreateP
   return {
     name,
     description: TOOL_DESCRIPTION,
-    inputSchema: PROP_SPEC_SCHEMA,
+    inputSchema: CREATE_PROP_SCHEMA,
     run (input: unknown): PropToolResult {
-      const attempt = tryBuildProp(input)
+      const attempt = tryCreateProp(input)
       if (!attempt.prop)
-        return { ok: false, spec: null, prop: null, issues: attempt.issues, review: null, report: attempt.report }
+        return { ok: false, preset: attempt.preset, spec: null, prop: null, issues: attempt.issues, review: null, report: attempt.report }
 
-      const critique = review ? reviewProp(attempt.prop) : null
-      const warnings = attempt.issues.length > 0 ? attempt.report : ''
+      try {
+        const critique = review ? reviewProp(attempt.prop) : null
+        const warnings = attempt.issues.length > 0 ? attempt.report : ''
 
-      return {
-        ok:     true,
-        spec:   attempt.spec,
-        prop:   attempt.prop,
-        issues: attempt.issues,
-        review: critique,
-        report: [ warnings, critique?.report ?? 'built' ].filter(Boolean).join('\n'),
+        return {
+          ok:     true,
+          preset: attempt.preset,
+          spec:   attempt.spec,
+          prop:   attempt.prop,
+          issues: attempt.issues,
+          review: critique,
+          report: [ warnings, critique?.report ?? 'built' ].filter(Boolean).join('\n'),
+        }
+      }
+      catch (error) {
+        attempt.prop.dispose()
+
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          ok:     false,
+          preset: attempt.preset,
+          spec:   attempt.spec,
+          prop:   null,
+          issues: [ ...attempt.issues, { level: 'error', path: '$', message }],
+          review: null,
+          report: `error $: ${message}`,
+        }
       }
     },
   }

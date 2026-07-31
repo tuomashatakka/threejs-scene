@@ -19,9 +19,9 @@ import {
   reviewProp,
   tryBuildProp,
   validatePropSpec,
-} from 'ꭍ/authoring'
+} from 'ꭍ/assets'
 
-import type { NormalizedPart, PropSpec, ShapeName } from 'ꭍ/authoring'
+import type { NormalizedPart, PropSpec, ShapeName } from 'ꭍ/assets'
 
 
 function normalizedPart (overrides: Partial<NormalizedPart> = {}): NormalizedPart {
@@ -433,7 +433,7 @@ describe('the model-facing surface', () => {
     const tool = createPropTool()
 
     expect(tool.name).toBe('create_prop')
-    expect(tool.inputSchema.required).toEqual([ 'name', 'parts' ])
+    expect(tool.inputSchema.oneOf).toHaveLength(3)
 
     const broken = tool.run('not json at all')
     expect(broken.ok).toBe(false)

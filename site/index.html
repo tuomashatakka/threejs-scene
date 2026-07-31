@@ -21,6 +21,7 @@
     <div class="cta">
       <a class="btn primary" href="./app.html">Live demo</a>
       <a class="btn" href="./starters.html">Starter templates</a>
+      <a class="btn" href="./starters.html#assets">Asset gallery</a>
       <a class="btn" href="https://github.com/tuomashatakka/threejs-scene">View on GitHub</a>
       <a class="btn" href="https://www.npmjs.com/package/threejs-scene">npm</a>
     </div>
@@ -58,6 +59,21 @@
         <p>Every module tears down cleanly. <code>app.dispose()</code> walks the chain so nothing leaks between scenes.</p>
       </div>
     </div>
+  </section>
+
+  <section>
+    <h2>LLM-first procedural assets</h2>
+    <p>
+      One synchronous <code>createProp()</code> accepts exact presets, structured
+      requests, model-produced JSON or prose, and registered procedural definitions.
+      The same serializable manifest powers the full public gallery.
+    </p>
+    <pre><code>import { createProp, ASSET_MANIFEST } from 'threejs-scene/modules/assets'
+
+const crate = createProp('crate', { scale: 1.2 })
+const custom = createProp(modelOutput)
+scene.add(crate, custom)</code></pre>
+    <p class="muted"><a href="./starters.html#assets">Browse every texture, material, and prop preset &rarr;</a></p>
   </section>
 
   <section>

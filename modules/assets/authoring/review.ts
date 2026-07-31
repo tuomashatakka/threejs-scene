@@ -1,4 +1,4 @@
-// modules/authoring/review.ts
+// modules/assets/authoring/review.ts
 // The critic.
 //
 // Validation answers "is this buildable?". It is not the interesting question —
@@ -15,7 +15,7 @@
 
 import * as THREE from 'three'
 
-import type { Prop } from '../assets/index.js'
+import type { Prop } from '../prop.js'
 import type { SpecIssue } from './validate.js'
 
 

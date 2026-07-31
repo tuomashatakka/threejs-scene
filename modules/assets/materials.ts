@@ -6,6 +6,8 @@
 
 import * as THREE from 'three'
 
+import { createMatcapTexture } from './textures.js'
+
 
 /**
  * Material parameters accepted by {@link createStandardMaterial}. This is the
@@ -103,6 +105,11 @@ export function createGradientRamp (steps = 4): THREE.DataTexture {
   texture.generateMipmaps = false
   texture.needsUpdate     = true
   return texture
+}
+
+/** Matcap material backed by a supplied or procedural studio-light texture. */
+export function createMatcapMaterial (matcap?: THREE.Texture): THREE.MeshMatcapMaterial {
+  return new THREE.MeshMatcapMaterial({ matcap: matcap ?? createMatcapTexture() })
 }
 
 // perf: cheap. One shader compile per distinct material; share instances.

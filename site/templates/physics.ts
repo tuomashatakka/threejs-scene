@@ -5,9 +5,9 @@
 //   CLOTH    a tarp lashed to a frame, breathing in the wind. A grid of cannon-es
 //            particles held by distance constraints, so it is in the SAME solver
 //            as everything else — drop a barrel on it and both react.
-//   LIQUID   cannon's SPH subsystem: every drop samples its neighbours for
-//            density and gets pressure and viscosity back. It sloshes because
-//            fluid does, not because anything animates it.
+//   LIQUID   spatial-hashed position-based fluid: cannon handles obstacles,
+//            density constraints keep the volume, and marching cubes draws one
+//            continuous surface over the particles.
 //   KINETIC  barrels and crates released down a ramp, plus a sign swinging from
 //            a hinge constraint.
 //
@@ -74,17 +74,20 @@ function yard (physics: PhysicsApi): AppModule<YardState> {
       owned.push(ramp.geometry, ramp.material as THREE.Material)
       addStaticBox(physics, [ 3.2, 0.24, 5.5 ], [ -3.4, 1.5, 0 ], [ 0, 0, -0.42 ])
 
-      // the basin the liquid pours into: four walls, visual and physical
+      // the basin the liquid pours into. The front wall is cut away visually,
+      // while its full-height invisible collider still contains the surface.
       const wallMaterial = new THREE.MeshStandardMaterial({ color: '#4a4640', roughness: 0.9, metalness: 0.3 })
       owned.push(wallMaterial)
       for (const [ x, z ] of [[ 1.6, 0 ], [ -1.6, 0 ], [ 0, 1.6 ], [ 0, -1.6 ]] as const) {
-        const size: [number, number, number] = [ x === 0 ? 3.4 : 0.2, 1.1, z === 0 ? 3.4 : 0.2 ]
-        const wall                           = new THREE.Mesh(new THREE.BoxGeometry(...size), wallMaterial)
-        wall.position.set(4.2 + x, 0.55, z)
+        const physicsSize: [number, number, number] = [ x === 0 ? 3.4 : 0.2, 1.1, z === 0 ? 3.4 : 0.2 ]
+        const cutaway                               = z === 1.6
+        const visualSize: [number, number, number]  = [ physicsSize[0], cutaway ? 0.34 : physicsSize[1], physicsSize[2] ]
+        const wall                                  = new THREE.Mesh(new THREE.BoxGeometry(...visualSize), wallMaterial)
+        wall.position.set(4.2 + x, visualSize[1] / 2, z)
         wall.castShadow = wall.receiveShadow = true
         ctx.scene.add(wall)
         owned.push(wall.geometry)
-        addStaticBox(physics, size, [ 4.2 + x, 0.55, z ])
+        addStaticBox(physics, physicsSize, [ 4.2 + x, 0.55, z ])
       }
 
       // scenery: the keep-out solver places it, one draw call per prop type
@@ -186,31 +189,37 @@ function simulations (physics: PhysicsApi): AppModule<YardState> {
 
       // ── liquid ─────────────────────────────────────────────────────────
       liquid = createLiquid(physics, {
-        count:     260,
-        at:        [ 4.2, 2.2, 0 ],
-        spawn:     [ 1.6, 1.1, 1.6 ],
-        radius:    0.085,
-        smoothing: 0.3,
-        viscosity: 0.05,
-        color:     '#3f7048',
-        rng:       rng.fork('liquid'),
+        count:          320,
+        at:             [ 4.2, 2.2, 0 ],
+        spawn:          [ 1.6, 1.1, 1.6 ],
+        radius:         0.08,
+        neighborRadius: 0.24,
+        iterations:     4,
+        viscosity:      0.02,
+        cohesion:       0.01,
+        color:          '#3f8d78',
+        rng:            rng.fork('liquid'),
       })
       ctx.scene.add(liquid.mesh)
 
       // ── kinetics ───────────────────────────────────────────────────────
-      // barrels and crates released at the top of the ramp
+      // atomic barrels and crates are direct children of a drop root;
+      // addEach gives every child its own body rather than binding the pile.
       const drop = rng.fork('drop')
-      for (const [ name, count, mass ] of [[ 'barrel-cluster', 5, 14 ], [ 'crate-stack', 4, 9 ]] as const) {
+      for (const [ name, count, mass ] of [[ 'barrel', 6, 7 ], [ 'crate', 5, 5 ]] as const) {
         const geometry = buildKitGeometry(name, { rng: rng.fork(name) })
         owned.push(geometry)
+
+        const dropRoot = new THREE.Group()
 
         for (let i = 0; i < count; i++) {
           const mesh      = new THREE.Mesh(geometry, material)
           mesh.castShadow = mesh.receiveShadow = true
           mesh.position.set(-6 + drop.range(-0.6, 0.6), 4.6 + i * 1.4, drop.range(-1, 1))
-          ctx.scene.add(mesh)
-          physics.add(mesh, { mass, restitution: 0.08, friction: 0.85, angularDamping: 0.45 })
+          dropRoot.add(mesh)
         }
+        ctx.scene.add(dropRoot)
+        physics.addEach(dropRoot, { mass, restitution: 0.08, friction: 0.85, angularDamping: 0.45 })
       }
 
       // a sign hanging off a hinge — kinetics you can read at a glance
@@ -296,7 +305,6 @@ export function mount (canvas: HTMLCanvasElement): App<YardState> {
 }
 
 // perf: ~8 draw calls for the scenery (one per instanced prop type) + one for
-// the liquid (260 instanced drops) + the cloth + the kinetic props. The step is
-// the real cost: 169 cloth particles with ~450 constraints, 260 SPH particles
-// with an O(n²) neighbour search, and a dozen rigid bodies, all at a fixed
-// 60Hz — comfortable on a laptop, warm on a phone.
+// the liquid surface + the cloth + kinetic props. The step is the real cost:
+// 169 cloth particles with ~450 constraints and 320 fluid particles using a
+// spatial hash with four local constraint passes, all at a fixed 60Hz.

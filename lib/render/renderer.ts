@@ -19,7 +19,7 @@ export interface RendererOptions {
   pixelRatioMax?: number
 
   /**
-   * Enable PCF soft shadow maps.
+   * Enable PCF shadow maps.
    * @defaultValue true
    */
   shadows?: boolean
@@ -36,7 +36,7 @@ export interface RendererOptions {
 
 /**
  * Create a `WebGLRenderer` with production defaults: high-performance power
- * preference, sRGB output, ACES filmic tone mapping, PCF soft shadows, and
+ * preference, sRGB output, ACES filmic tone mapping, PCF shadows, and
  * pixel ratio capped at 2. The renderer is sized to the canvas parent element
  * (falling back to `document.body`) without touching the canvas CSS size.
  *
@@ -72,7 +72,7 @@ export function createRenderer ({
 
   if (shadows) {
     renderer.shadowMap.enabled = true
-    renderer.shadowMap.type    = THREE.PCFSoftShadowMap
+    renderer.shadowMap.type    = THREE.PCFShadowMap
   }
 
   return renderer

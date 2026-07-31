@@ -1,4 +1,4 @@
-// modules/authoring/validate.ts
+// modules/assets/authoring/validate.ts
 // The forgiving front door.
 //
 // A 70B model emits the schema. A 3B model emits something SHAPED like the
@@ -17,7 +17,7 @@ import * as THREE from 'three'
 import { FLAT_SHAPES, PART_DEFAULTS, SHAPE_NAMES, SPEC_LIMITS, SURFACE_NAMES } from './spec.js'
 import { resolveRelations } from './relations.js'
 
-import type { MaterialPreset } from '../assets/index.js'
+import type { MaterialPreset } from '../materials.js'
 import type {
   AxisName,
   NormalizedPart,

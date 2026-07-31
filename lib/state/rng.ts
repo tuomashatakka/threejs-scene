@@ -19,6 +19,32 @@ export function mulberry32 (seed: number): () => number {
   }
 }
 
+/** Stateless 2D coordinate hash to [0, 1). */
+export function hash2 (x: number, y: number): number {
+  const value = Math.sin(x * 127.1 + y * 311.7) * 43_758.5453
+  return value - Math.floor(value)
+}
+
+/** Stateless 3D coordinate hash to [0, 1). */
+export function hash3 (x: number, y: number, z: number): number {
+  const value = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43_758.5453
+  return value - Math.floor(value)
+}
+
+/** Linear interpolation from `a` to `b` by `t`. */
+export function lerp (a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
+/** Hermite smoothstep, including the degenerate equal-edge case. */
+export function smoothstep (edge0: number, edge1: number, value: number): number {
+  if (edge0 === edge1)
+    return value < edge0 ? 0 : 1
+
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
+}
+
 // FNV-1a string hash, used to derive a stable sub-seed from a fork label.
 function hashLabel (label: string, salt: number): number {
   let h = (2166136261 ^ salt) >>> 0

@@ -1,4 +1,4 @@
-// modules/authoring/layout.ts
+// modules/assets/authoring/layout.ts
 // Repetition, expanded.
 //
 // `repeat` exists because the failure mode of a small model is not inventing a
