@@ -56,6 +56,26 @@
         "default": "./dist/cjs/modules/assets/index.js"
       }
     },
+    "./modules/authoring": {
+      "import": {
+        "types": "./dist/modules/authoring/index.d.ts",
+        "default": "./dist/modules/authoring/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/authoring/index.d.ts",
+        "default": "./dist/cjs/modules/authoring/index.js"
+      }
+    },
+    "./modules/physics": {
+      "import": {
+        "types": "./dist/modules/physics/index.d.ts",
+        "default": "./dist/modules/physics/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/physics/index.d.ts",
+        "default": "./dist/cjs/modules/physics/index.js"
+      }
+    },
     "./modules/post/webgl": {
       "import": {
         "types": "./dist/modules/post/webgl/index.d.ts",
@@ -111,6 +131,7 @@
   "author": "Tuomas Hatakka",
   "license": "ISC",
   "peerDependencies": {
+    "cannon-es": ">=0.20.0",
     "three": ">=0.160.0"
   },
   "dependencies": {
@@ -120,9 +141,11 @@
     "@arethetypeswrong/cli": "^0.18.2",
     "@tuomashatakka/eslint-config": "^4.0.1",
     "@types/three": "^0.184.1",
+    "cannon-es": "^0.20.0",
     "eslint": "^10.7.0",
     "publint": "^0.3.12",
     "three": "^0.184.0",
+    "three-mesh-bvh": "^0.9.13",
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
@@ -144,6 +167,11 @@
         "./dist/cjs/modules/*.d.ts",
         "./dist/cjs/modules/*/index.d.ts"
       ]
+    }
+  },
+  "peerDependenciesMeta": {
+    "cannon-es": {
+      "optional": true
     }
   }
 }

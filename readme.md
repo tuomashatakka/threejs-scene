@@ -87,8 +87,9 @@ Every effect's parameters are adjustable live in the
 
 ## Starter templates
 
-Three scaffolded apps — an isometric tilt-shift endless scape, a third-person
-hovership racer, and a studio product display — are on the
+Five scaffolded apps — an isometric tilt-shift endless scape, a third-person
+hovership racer, a studio product display, a gallery of props compiled from
+LLM-authored JSON, and a physics yard — are on the
 [starters page](https://tuomashatakka.github.io/threejs-scene/starters.html),
 each showing its complete source beside the running scene. The source is
 imported twice (as a module to run, and via Vite's `?raw` to display), so the
@@ -108,6 +109,13 @@ Each one is a worked example of tying a camera to something else in the scene:
 - **Product** — the camera revolves around a product that never moves (so the
   key light rakes across it, which spinning the object cannot fake), and the
   pointer leans the rig a few degrees for parallax.
+- **LLM prop authoring** — every object on the plinth was JSON a moment ago,
+  compiled by `modules/authoring`. Two of them came from deliberately sloppy
+  model output; the console prints what each prop's critique would tell the
+  model back.
+- **Salvage yard physics** — cloth, liquid and kinetics in one deterministic
+  world: a tarp breathing in the wind, SPH fluid sloshing in a basin, barrels
+  coming down a ramp, on scenery placed by the keep-out solver.
 
 ## Content: props, materials, textures
 
@@ -134,6 +142,186 @@ Also here: `MATERIAL_PRESETS` (`metal`, `chrome`, `gold`, `plastic`, `rubber`,
 textures (`createGridTexture`, `createNoiseTexture`, `createGradientTexture`),
 and a starter prop catalogue (`crystalProp`, `rockProp`, `treeProp`,
 `lampPostProp`).
+
+### The low-poly prop kit
+
+The same module carries the tooling a flat-shaded kit is actually built from —
+bake the look into the vertices, collapse a prop into one geometry, and stamp it:
+
+```ts
+import {
+  part, mergeParts,          // primitives → one merged, vertex-coloured geometry
+  bakeFacetColors, applyGrime, kitMaterial,
+  buildKitGeometry, kitProp, // 14 ready-made wasteland props
+  createPlacementField, scatterInstances,
+} from 'threejs-scene/modules/assets'
+
+const material = kitMaterial()          // ONE material for the whole kit
+const tower    = buildKitGeometry('watchtower')
+
+// or build your own: primitives in, one draw call out
+const crate = mergeParts([
+  part(new THREE.BoxGeometry(1, 1, 1), { at: [ 0, 0.5, 0 ], color: '#8a6a44', rng }),
+  part(new THREE.BoxGeometry(1.06, 0.08, 1.06), { at: [ 0, 0.12, 0 ], color: '#4a3728', rng }),
+], { grime: 1 })
+```
+
+`part()` transforms a primitive and bakes one jittered shade per triangle;
+`mergeParts()` collapses them through three's own `BufferGeometryUtils` and
+darkens toward the base (the cheapest ambient occlusion there is). The result is
+one geometry per prop *type*, which is the only form that can be instanced.
+
+The kit: `ruined-block`, `crumbled-building`, `container`, `crate-stack`,
+`watchtower`, `pylon`, `wreck-car`, `dead-tree`, `barrel-cluster`, `rubble-pile`,
+`barricade`, `tire-stack`, `road-sign`, `crag` — each seeded, so
+`buildKitGeometry('crag')` is the same crag every time and
+`buildKitGeometry('crag', { rng })` is a different one each call.
+
+### Placement is a solver, not a list
+
+You describe the rules; it finds the coordinates:
+
+```ts
+const field = createPlacementField({ rng, extent: 64, heightAt, minHeight: 0 })
+
+const { mesh, placed } = scatterInstances({
+  geometry, material, count: 40,
+  place: () => {
+    const spot = field.place({ radius: 2.7, minDistance: 10, avoidCorridor: 4.8 })
+    return spot && { at: [ spot.x, heightAt(spot.x, spot.z), spot.z ], rotate: [ 0, rng.next() * 6.28, 0 ] }
+  },
+})
+```
+
+Keep-out spacing, a corridor to stay out of, a range, a waterline — enforced by
+the field, not by the caller. Forty props, one draw call, per-instance tint so
+identical geometry does not read as identical objects.
+
+## Props from language models
+
+`modules/authoring` lets a **small** model author props. Not by writing
+three.js — by filling in a tiny JSON dialect that is validated, compiled, and
+then critiqued, so the model can fix its own mistakes:
+
+```ts
+import { createPropTool, generateProp, buildProp } from 'threejs-scene/modules/authoring'
+
+scene.add(buildProp({
+  name:  'crate',
+  parts: [
+    { name: 'body', shape: 'box', size: [ 0.8, 0.8, 0.8 ], at: [ 0, 0.4, 0 ], color: '#8a6a44' },
+    { name: 'band', shape: 'box', size: [ 0.84, 0.07, 0.84 ], at: [ 0, 0.08, 0 ],
+      repeat: { count: 2, mode: 'linear', offset: [ 0, 0.64, 0 ] }},
+  ],
+}))
+```
+
+The dialect is designed around what small models get right. Units are metres,
+y is up, the ground is `y = 0`. Every shape — `box`, `sphere`, `cylinder`,
+`cone`, `pyramid`, `prism`, `capsule`, `torus`, `knot`, `crystal`, `rock`,
+`wedge`, `plane`, `disc`, `ring` — is sized by the box it fills, so there are no
+constructor signatures to remember. Rotations are in degrees. `repeat`
+(`linear` / `radial` / `mirror`) covers legs, spokes and railings, so four table
+legs are one part, not four chances to fat-finger a coordinate.
+
+And `on` replaces the coordinate a model is least able to compute:
+
+```jsonc
+{ "name": "stem", "shape": "cylinder", "size": [0.09, 0.68, 0.09], "on": "base" },
+{ "name": "top",  "shape": "cylinder", "size": [0.8, 0.05, 0.8],   "on": "stem" }
+```
+
+Metric estimation is the measured failure — GPT-4o scores ~10-12% on
+object-distance and object-size on Apple's CA-VQA benchmark — while stating a
+*relation* is something even small models get right. So the model says "the top
+rests on the stem" and the solver computes the height before anything is built,
+the same split Holodeck and SceneCraft arrived at.
+
+Four pieces, each usable on its own:
+
+```ts
+import {
+  validatePropSpec,   // repairs "cube" → "box", "position" → "at", "0.4" → 0.4, …
+  buildProp,          // spec → Prop, deterministic, one geometry per part
+  reviewProp,         // measures the BUILT prop: floats? detached? buried? too heavy?
+  propAuthoringPrompt // the grammar + worked examples, ~2.8k chars (or 1.4k compact)
+} from 'threejs-scene/modules/authoring'
+```
+
+`createPropTool()` packages them as a provider-agnostic tool definition — a
+name, a description, a JSON Schema (`PROP_SPEC_SCHEMA`), and a `run` that never
+throws — so it drops into Anthropic `input_schema`, OpenAI/Gemini `parameters`,
+an ai-sdk tool, or a constrained decoder for a local model.
+
+`generateProp()` closes the loop, which is where the quality actually comes
+from — one shot from a 3B model is a coin flip, but the same model, told *"the
+prop floats 0.4m above the ground"*, usually fixes it next turn:
+
+```ts
+const { prop, review, attempts } = await generateProp({
+  brief:    'a mossy stone well',
+  attempts: 3,
+  complete: async ({ system, prompt }) => callYourModel(system, prompt),  // any model, any SDK
+})
+
+scene.add(prop)
+console.log(review.report)
+// mossy stone well: 7 meshes, 1.4k triangles, 1.2 × 1.6 × 1.2m, sits on the ground
+```
+
+Everything is DOM-free and GL-free: a server can validate, build, measure, and
+critique a prop with no canvas anywhere. See the **LLM prop authoring** starter
+for the whole path running live, sloppy model output included.
+
+## Physics: rigid bodies, cloth, and liquid
+
+`modules/physics` is an optional layer over [cannon-es](https://github.com/pmndrs/cannon-es)
+— the engine from three's own [libraries list](https://threejs.org/manual/#en/libraries-and-plugins)
+that is pure ESM with no wasm and no async init, so it steps identically in a
+headless test and in the browser. It is an **optional peer dependency**: this is
+the only module that imports it.
+
+```sh
+npm i cannon-es
+```
+
+```ts
+import { physicsWorld, addGroundPlane, addStaticBox, createCloth, createLiquid } from 'threejs-scene/modules/physics'
+
+const physics = physicsWorld({ gravity: [ 0, -9.82, 0 ], iterations: 16 })
+const app     = createApp(canvas, { use: [ standardLighting(), physics ] })
+
+addGroundPlane(physics)
+physics.add(crate, { mass: 8, friction: 0.85 })     // bind any Object3D to a body
+
+const tarp = createCloth(physics, {                  // cloth
+  size: [ 4, 2.6 ], segments: 14, mass: 2.4,
+  at: [ -2, 3.3, -1.6 ], pin: 'top-edge', wind: [ 0, 0, 4 ],
+})
+const pool = createLiquid(physics, {                 // liquid (SPH)
+  count: 260, at: [ 4.2, 2.2, 0 ], spawn: [ 1.6, 1.1, 1.6 ], viscosity: 0.05, rng,
+})
+scene.add(tarp.mesh, pool.mesh)
+```
+
+- **Rigid / kinetic** — `physics.add(object, { mass, shape, friction, restitution })`
+  binds an `Object3D` to a body and drives its transform. `shape: 'auto'` fits a
+  box to the object's own bounding box.
+- **Cloth** — a grid of cannon particles held by distance constraints, in the
+  *same* solver as everything else, so a barrel dropped on the tarp moves it and
+  the tarp pushes back. `wind` is an acceleration in m/s², so behaviour does not
+  change when you change the sheet's mass or resolution.
+- **Liquid** — cannon's `SPHSystem`: each drop samples its neighbours for density
+  and gets pressure and viscosity forces back. It sloshes and finds its own level
+  because that is what the solver does, not because anything animates it. Drawn
+  as one instanced draw call.
+
+The world is stepped at a **fixed** rate with an accumulator regardless of frame
+rate, so the same start replays to the same pile — the determinism the rest of
+the package promises survives contact with a falling object. `onStep` /
+`onAfterStep` hook forces and readback around each step.
+
+See the **Salvage yard physics** starter for all three running together.
 
 ## Cameras
 
