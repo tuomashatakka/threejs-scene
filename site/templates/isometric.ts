@@ -579,10 +579,10 @@ export function mount (canvas: HTMLCanvasElement): App<ScapeState> {
       isoViewRig(tiltShift),
       terrainScape(),
 
-      postProcessing<ScapeState>({
-        bloom:   false,
-        effects: ctx => [ gradePass, createBloom({ strength: 0, threshold: 0.98, width: ctx.width, height: ctx.height }), tiltShift ],
-      }),
+//       postProcessing<ScapeState>({
+//         bloom:   false,
+//         effects: ctx => [ gradePass, createBloom({ strength: 0, threshold: 0.98, width: ctx.width, height: ctx.height }), tiltShift ],
+//       }),
     ],
   })
 
