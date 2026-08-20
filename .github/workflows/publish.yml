@@ -53,6 +53,13 @@ jobs:
       - run: bun run test
       - run: bun run build
 
+      # Generated from dist, so it can only be checked after a build. Warned
+      # about rather than rewritten: the file is committed, and a workflow that
+      # regenerates a committed doc mid-release hides a signature change behind
+      # a version bump.
+      - name: Check the llm reference is current
+        run: bun run llms:check
+
       - name: Check the published shape
         run: |
           bunx publint

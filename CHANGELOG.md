@@ -2,6 +2,19 @@
 
 Newest first. One entry per release: the headline, then what it costs a consumer.
 
+## 0.6.1
+
+**The package now tells an agent how to use it.**
+
+- **Ships `llms.txt`** — 198 signatures with their generics intact, grouped by the import path that provides them, after a preamble covering the module contract,
+  the eight rules that separate code which compiles from code which behaves, which entry point to reach for, the ortho-vs-perspective trap for post passes, and the
+  two consequences of `createStore` committing a new object per write. Readable at `node_modules/threejs-scene/llms.txt`.
+- **Generated from the built `.d.ts`, never hand-maintained.** The failure mode of a hand-written API list is that it drifts and then confidently describes a
+  function that no longer takes those arguments — and an agent trusts it. `npm run llms` regenerates; `npm run llms:check` fails when it is stale, and both
+  `prepublishOnly` and the release workflow run it, so a signature change cannot ship with a doc that disagrees.
+- Signatures are shown as a *caller* writes them: `tsc` emits the implementation's destructuring (`({ radius, maxPhi }?: OrbitOptions)`), which is rewritten to
+  `options?: OrbitOptions`.
+
 ## 0.6.0
 
 **Everything a scene needs to survive a device nobody tested it on, plus the two state primitives `createStore` implies.**

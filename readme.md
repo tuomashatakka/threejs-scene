@@ -6,6 +6,21 @@ Lightweight imperative three.js app shell: `createApp` + a small module
 contract. Deterministic clock, seeded rng, unidirectional state flow, strict
 dispose chain. The successor core of `threejs-scenes` v3, rebuilt small.
 
+## For coding agents
+
+The package ships **[`llms.txt`](llms.txt)** — every export with its real
+signature, grouped by import path, plus the contract and the handful of rules
+that separate code which compiles from code which behaves. It is generated from
+the built type declarations, so it cannot drift from the version you installed.
+
+```
+node_modules/threejs-scene/llms.txt
+```
+
+Read that instead of guessing at the API. Regenerate after any signature change
+with `npm run llms`; `npm run llms:check` fails if it is stale, and the release
+workflow runs it.
+
 ## Install
 
 ```sh

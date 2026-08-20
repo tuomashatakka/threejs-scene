@@ -1,0 +1,484 @@
+# threejs-scene 0.6.1
+
+Deterministic imperative three.js scenes. Vanilla three — **not** react-three-fiber.
+An app shell plus a module contract, a seeded rng, a fixed clock, and an explicit
+dispose chain.
+
+This file is generated from the built type declarations, so every signature below
+is the real one for this exact version.
+
+## The contract, in full
+
+```ts
+import { createApp, defineModule } from 'threejs-scene'
+
+interface State { speed: number }
+
+const turbine = defineModule<State>({
+  name: 'turbine',
+  build (ctx)                { /* create objects once, add to ctx.scene */ },
+  update (state, frame, ctx) { /* project state onto them, every sim tick */ },
+  resize (size, ctx)         { /* optional */ },
+  render (frame, ctx)        { /* optional — claims the draw */ },
+  dispose ()                 { /* release everything build allocated */ },
+})
+
+const app = createApp<State>(canvas, { state: { speed: 1 }, use: [ turbine ] })
+
+app.start()                    // attach to the frame loop
+app.setState({ speed: 2 })     // shallow-merge, notifies subscribers
+app.tick(1 / 60)               // step deterministically instead (headless)
+app.dispose()                  // loop, modules (reverse order), scene, renderer
+```
+
+State flows **down** (`store → module.update → scene`); input flows **back**
+through `setState`/`dispatch`. Never write app state from inside a scene object.
+Same seed plus same tick sequence reproduces the same world, headless included.
+
+`ctx` is a `SceneContext`: `{ scene, camera, renderer, rng, clock }`. The `rng`
+is seeded from `AppOptions.seed`.
+
+## Rules that stop working code from behaving wrongly
+
+1. **`createApp` owns the only render loop.** Never call
+   `requestAnimationFrame` yourself. Animate in `update`.
+2. **The frame cap is page-global.** `loop.fps` goes to a shared framecapper
+   ([`@tuomashatakka/canvas-loop-framecapper`](https://www.npmjs.com/package/@tuomashatakka/canvas-loop-framecapper)),
+   so it applies to every loop on the page. Always pass it explicitly, including
+   `0` for uncapped — a scene that omits it inherits whatever the last one asked
+   for.
+3. **The loop starts paused.** Call `start()`, or `tick()` per frame yourself.
+4. **Generation in `build`, animation in `update`, viewport in `resize`,
+   teardown in `dispose`.** Everything a module puts on the GPU it releases.
+5. **Only one `render` hook wins.** Last-mounted module takes it; a top-level
+   `AppOptions.render` overrides all of them. Prefer the module.
+6. **`modules/assets` is DOM-free and SSR-safe** — textures are `DataTexture`,
+   never canvas. Keep it that way; it is what makes headless tests work.
+7. **Determinism is a feature.** Use `createSeededRng` and fork it by name
+   (`rng.fork('trees')`) so adding one consumer does not reshuffle every consumer
+   after it. Never `Math.random`. Never `Date.now` for animation — take time
+   from `frame`.
+8. **`disposeScene` and `disposeMaterial` dispose indiscriminately.** If you
+   pool materials, mark them with `markShared` and tear down per module instead.
+
+## Choosing an import path
+
+Everything ships ESM **and** CJS, so `require('threejs-scene')` resolves from a
+server bundle.
+
+| need | path |
+| --- | --- |
+| app shell, loop, store, camera, input, diagnostics | `threejs-scene` |
+| geometry, materials, textures, props | `threejs-scene/modules/assets` |
+| a post chain | `threejs-scene/modules/post` |
+| one specific pass | `threejs-scene/modules/post/webgl` |
+| light rigs | `threejs-scene/modules/lighting` |
+| orbit controls | `threejs-scene/modules/orbit` |
+| rigid bodies, cloth, liquid | `threejs-scene/modules/physics` (peer: `cannon-es`) |
+
+## Camera choice matters for passes
+
+`createIsoCamera` returns an **orthographic** rig. Several three.js passes are
+written for a perspective camera and misbehave under ortho — `BokehPass`-based
+depth of field is the usual one, and god-ray style passes that test whether the
+sun is behind the camera need a hand-supplied screen position instead. Check
+before wiring a pass into an ortho scene.
+
+`createFollowCamera` is a damped **perspective** chase rig; it is not an ortho
+follow.
+
+## When it works everywhere except on one device
+
+three links every program when the app mounts but does not *check* the link until
+the program's first use — so a program that will not link is bound to a draw
+anyway, every draw raises `INVALID_OPERATION`, and the driver eventually takes
+the context away. It looks thermal. It is not.
+
+```ts
+import { reportPrograms } from 'threejs-scene'
+
+const halt = reportPrograms(app.ctx.renderer, { say: log, fail: log }, false)
+
+if (!halt)
+  app.start()   // draws are what turn a refused program into a dead context
+```
+
+For refusals the driver logs nothing about: `readVaryings(source)` walks the
+`#ifdef`s and `#define`s *together*, so a varying inside a branch the program
+never takes is not counted; `packedRows` packs them as a driver would, and
+`varyingRowLimit(gl)` says how many rows this one has.
+
+Then `readQualitySignals()` for the cheap device proxies and
+`createLadderMemory` to stop re-learning a crash on every load. Neither picks a
+budget — that mapping is yours.
+
+## State that outlives one mount
+
+`createStore` commits a **new object** on every write. Two consequences:
+
+- A section destructured at build time and read every frame silently freezes.
+  Read through a getter per frame instead.
+- `withPath(state, path, value)` is `writePath` without the mutation — copies
+  only the spine, and returns the **same** object when the value was already
+  there, so a no-op write notifies nobody.
+
+`createStateAccess(authored)` covers the case where ownership changes over time:
+a plain object before the app mounts, the store after `adopt(store)`, and the
+last committed state handed back by the release function on teardown.
+
+## Full export index
+
+### `threejs-scene`
+
+the app shell: loop, store, camera, renderer, input, disposal, diagnostics
+
+
+**functions** (40)
+
+```ts
+aimIsoCamera(camera: THREE.OrthographicCamera, aim?: IsoAimOptions): void
+attachPointerGesture(el: HTMLElement, callbacks: PointerGestureCallbacks, options?: PointerGestureOptions): () => void
+attachResizeObserver(renderer: THREE.WebGLRenderer, camera: THREE.Camera, canvas: HTMLCanvasElement, onResize?: ResizeHandler): () => void
+auditPrograms(renderer: WebGLRenderer): ProgramFault[]
+censusProgram(gl: WebGL2RenderingContext, program: WebGLProgram, name: string): ProgramCensus
+censusPrograms(renderer: WebGLRenderer): ProgramCensus[]
+createApp<S extends object = Record<string, unknown>, A = Partial<S>>(canvas: HTMLCanvasElement, options?: AppOptions<S, A>): App<S, A>
+createClock(options?: ClockOptions): Clock
+createFollowCamera(options?: FollowCameraOptions): FollowCamera
+createFrameLoop(options?: FrameLoopOptions): FrameLoop
+createIsoCamera(aspect: number, options?: IsoCameraOptions): THREE.OrthographicCamera
+createLadderMemory<T extends string>(options: LadderMemoryOptions<T>): LadderMemory<T>
+createRenderer(options: RendererOptions): THREE.WebGLRenderer
+createSeededRng(seed: number): SeededRng
+createStateAccess<S extends object>(authored: S): StateAccess<S>
+createStore<S extends object, A = Partial<S>>(initial: S, reducer?: Reducer<S, A>): Store<S, A>
+defineModule<S extends object = Record<string, unknown>>(module: AppModule<S>): AppModule<S>
+describeCensus(census: ProgramCensus, rowLimit: number): string
+describeQualitySignals(signals: QualitySignals): string
+disposeMaterial(mat: THREE.Material): void
+disposeMesh(mesh: THREE.Mesh, options?: DisposeMeshOptions): void
+disposeScene(root: THREE.Object3D): void
+hash2(x: number, y: number): number
+hash3(x: number, y: number, z: number): number
+lerp(a: number, b: number, t: number): number
+mulberry32(seed: number): () => number
+openStorage(probe: string): Storage | null
+packedRows(varyings: VaryingCount[]): number
+readNumberPath(root: object, path: string, fallback?: number): number
+readPath(root: object, path: string): unknown
+readQualitySignals(options?: QualitySignalOptions): QualitySignals
+readTextPath(root: object, path: string, fallback?: string): string
+readVaryings(source: string): VaryingCount[]
+reportPrograms(renderer: WebGLRenderer, report: AuditReport, auditOnly: boolean): boolean
+resizeIsoCamera(camera: THREE.OrthographicCamera, aspect: number): void
+smoothstep(edge0: number, edge1: number, value: number): number
+valueNoise1d(at: number, span: number, phase?: number): number
+varyingRowLimit(gl: WebGL2RenderingContext): number
+withPath<S extends object>(state: S, path: string, value: unknown): S
+writePath(root: object, path: string, value: unknown): void
+```
+
+**types** (42): `App`, `AppCameraOptions`, `AppLoopOptions`, `AppModule`, `AppOptions`, `AppSceneOptions`, `AuditReport`, `Clock`, `ClockMode`, `ClockOptions`, `Disposable`, `DisposeMeshOptions`, `FollowCamera`, `FollowCameraOptions`, `FollowCameraStation`, `FrameCallback`, `FrameContext`, `FrameLoop`, `FrameLoopOptions`, `IsoAimOptions`, `IsoCameraOptions`, `LadderMemory`, `LadderMemoryOptions`, `ModuleHandle`, `PointerGestureCallbacks`, `PointerGestureOptions`, `ProgramCensus`, `ProgramFault`, `QualitySignalOptions`, `QualitySignals`, `Reducer`, `RendererOptions`, `ResizeHandler`, `SceneContext`, `SeededRng`, `Size`, `StateAccess`, `StateValue`, `Store`, `StoreListener`, `VaryingCount`, `Vec3`
+
+### `threejs-scene/modules/assets`
+
+procedural geometry, materials, textures, props. DOM-free and deterministic
+
+
+**functions** (90)
+
+```ts
+applyBend(geo: THREE.BufferGeometry, angle: number, axis?: Axis): THREE.BufferGeometry
+applyGrime(geometry: THREE.BufferGeometry, options: GrimeOptions): THREE.BufferGeometry
+applyTaper(geo: THREE.BufferGeometry, factor: number, axis?: Axis): THREE.BufferGeometry
+applyTwist(geo: THREE.BufferGeometry, angle: number, axis?: Axis): THREE.BufferGeometry
+auditPalette(geometry: THREE.BufferGeometry, palette: Readonly<Record<string, string>>): PaletteAuditEntry[]
+bakeAlphaField(size: number, sampler: (field: Uint8Array) => void, options?: AlphaFieldOptions): THREE.DataTexture
+bakeFacetColors(geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation, options?: FacetColorOptions): THREE.BufferGeometry
+boatProp(options?: BoatOptions): Prop
+buildAndReview(spec: unknown): BuildAndReviewReturnType
+buildKitGeometry(name: KitPropName, options?: KitOptions): THREE.BufferGeometry
+buildProp(spec: PropSpec | NormalizedPropSpec | string, options?: BuildPropOptions): Prop
+buildPropDefinition(definition: PropDefinition, options?: Readonly<Record<string, unknown>>): Prop
+buildShape(part: NormalizedPart, seed?: number): THREE.BufferGeometry
+cloudProp(options?: CloudOptions): Prop
+createConnectionGraph(nodes: ReadonlyArray<readonly [number, number, number]>, options?: ConnectionGraphOptions): ConnectionGraph
+createExtrudedMesh(options: ExtrudeOptions): THREE.Mesh
+createGradientRamp(steps?: number): THREE.DataTexture
+createGradientTexture(options?: GradientTextureOptions): THREE.DataTexture
+createGridTexture(options?: GridTextureOptions): THREE.DataTexture
+createGroup(children?: THREE.Object3D[], transform?: Transform): THREE.Group
+createHolographicMaterial(options?: HolographicMaterialOptions): TickableMaterial
+createInfiniteGround(options?: InfiniteGroundOptions): InfiniteGround
+createInstancedProp(input: CreatePropInput, options: InstancedPropOptions): InstancedPropResult
+createLatheMesh(profile: ReadonlyArray<readonly [number, number] | THREE.Vector2>, options?: LatheOptions): THREE.Mesh
+createMatcapMaterial(matcap?: THREE.Texture): THREE.MeshMatcapMaterial
+createMatcapTexture(options?: MatcapTextureOptions): THREE.DataTexture
+createMaterialPreset(name: string, options?: Readonly<Record<string, unknown>>): THREE.Material
+createNoiseTexture(options?: NoiseTextureOptions): THREE.DataTexture
+createPathTube(points: THREE.Vector3[], options?: PathTubeOptions): THREE.BufferGeometry
+createPlacementField(options: PlacementFieldOptions): PlacementField
+createProp(input: CreatePropInput, options?: Readonly<Record<string, unknown>>): Prop
+createPropComposite(parts: readonly CompositePart[]): PropComposite
+createPropRegistry(initial?: readonly PropDefinition[]): PropRegistry
+createPropTool(options?: CreatePropToolOptions): PropTool
+createRockGeometry(options?: RockGeometryOptions): THREE.BufferGeometry
+createSeamlessNoiseTexture(options?: SeamlessNoiseTextureOptions): THREE.DataTexture
+createStandardMaterial(preset: MaterialPreset | MaterialPresetParams, overrides?: MaterialPresetParams): THREE.MeshStandardMaterial
+createSurfaceRibbon(options: SurfaceRibbonOptions): THREE.BufferGeometry | null
+createTexturePreset(name: string, options?: Readonly<Record<string, unknown>>): THREE.DataTexture
+createToonMaterial(options?: ToonMaterialOptions): THREE.MeshToonMaterial
+createTriplanarMaterial(options?: TriplanarMaterialOptions): THREE.ShaderMaterial
+crystalProp(options?: CrystalOptions): Prop
+defineProp(definition: PropDefinition): PropDefinition
+displaceByNoise(geo: THREE.BufferGeometry, options?: NoiseDisplaceOptions): THREE.BufferGeometry
+edgeSplit(geo: THREE.BufferGeometry, cutOffAngleRad?: number, keepNormals?: boolean): THREE.BufferGeometry
+extractJson(text: string): unknown
+extrudeAlongPath(shape: THREE.Shape, path: THREE.Curve<THREE.Vector3>, options?: ExtrudeAlongPathOptions): THREE.Mesh
+fitToSize(geometry: THREE.BufferGeometry, size: SpecVec3): THREE.BufferGeometry
+formatIssues(issues: readonly SpecIssue[], title?: string): string
+gearShape(teeth: number, outerRadius: number, innerRadius: number, toothDepth?: number): THREE.Shape
+generateProp(options: GeneratePropOptions): Promise<PropGeneration>
+groupBounds(obj: THREE.Object3D): THREE.Box3
+kitMaterial(overrides?: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial
+kitProp(name: KitPropName, options?: KitOptions & { material?: THREE.Material
+lampPostProp(options?: LampPostOptions): Prop
+layoutGrid(objects: THREE.Object3D[], options?: GridLayout): THREE.Object3D[]
+layoutRadial(objects: THREE.Object3D[], options?: RadialLayout): THREE.Object3D[]
+layoutStack(objects: THREE.Object3D[], axis?: Axis, spacing?: number): THREE.Object3D[]
+markShared<T extends THREE.Material | THREE.BufferGeometry | THREE.Texture>(resource: T): T
+mergeGeometryList(geometries: THREE.BufferGeometry[], useGroups?: boolean): THREE.BufferGeometry
+mergeMeshes(meshes: THREE.Mesh[]): THREE.Object3D
+mergeParts(parts: THREE.BufferGeometry[], options?: MergePartsOptions): THREE.BufferGeometry
+mergeVertices(geo: THREE.BufferGeometry, tolerance?: number): THREE.BufferGeometry
+ownsResource(resource: THREE.Material | THREE.BufferGeometry | THREE.Texture): boolean
+parallelTransportFrames(points: THREE.Vector3[]): TransportFrames
+part(geometry: THREE.BufferGeometry, options?: PartOptions): THREE.BufferGeometry
+polygonShape(sides: number, radius: number): THREE.Shape
+propAuthoringPrompt(options?: PromptOptions): string
+propRetryPrompt(report: string): string
+rasterizeAscii(geometry: THREE.BufferGeometry, options?: AsciiRasterOptions): AsciiRasterResult
+recomputeNormals(geo: THREE.BufferGeometry): THREE.BufferGeometry
+resolveParam(spec: ParamSpec, given: unknown): ParamValue
+resolveParams(specs: ParamSpecMap, given?: Readonly<Record<string, unknown>>): Record<string, ParamValue>
+resolvePlacements(part: NormalizedPart): Placement[]
+resolveRelations(parts: NormalizedPart[], report: Report): NormalizedPart[]
+reviewProp(prop: Prop): PropReview
+ribbonIndices(first: number, sections: number, across: number): number[]
+ringShape(outerRadius: number, innerRadius: number): THREE.Shape
+rockProp(options?: RockOptions): Prop
+roundedRectShape(width: number, height: number, radius: number): THREE.Shape
+scatterInstances(options: ScatterOptions): ScatterResult
+simplifyGeometry(geo: THREE.BufferGeometry, targetCount: number): THREE.BufferGeometry
+spread(count: number, span: number): number[]
+starShape(points: number, outerRadius: number, innerRadius: number): THREE.Shape
+tessellateGeometry(geo: THREE.BufferGeometry, maxEdgeLength?: number, iterations?: number): THREE.BufferGeometry
+traceSections(path: readonly RibbonPoint[], step: number): RibbonSection[]
+treeProp(options?: TreeOptions): Prop
+tryBuildProp(spec: unknown, options?: BuildPropOptions): BuildAttempt
+tryCreateProp(input: unknown, options?: Readonly<Record<string, unknown>>): CreatePropAttempt
+validatePropSpec(input: unknown): SpecReview
+```
+
+**values** (27)
+
+```ts
+ASCII_SHADES= " .:-~=+*#%@"
+ASCII_VIEWS: Record<string, AsciiView>
+ASSET_MANIFEST: { version: number
+ball: (radius: number, segments?: number) => THREE.BufferGeometry
+blade: (width: number, height: number, segments?: number) => THREE.BufferGeometry
+box: (width: number, height: number, depth: number) => THREE.BufferGeometry
+cone: (radius: number, height: number, sides?: number) => THREE.BufferGeometry
+CREATE_PROP_SCHEMA: JsonSchema
+cyl: (top: number, bottom: number, height: number, sides?: number) => THREE.BufferGeometry
+deg: (value: number) => number
+FLAT_SHAPES: readonly ShapeName[]
+hedron: (radius: number, detail?: number) => THREE.BufferGeometry
+KIT_PALETTE: { readonly concrete: "#8d8579"
+KIT_PROP_NAMES: readonly ["ruined-block", "crumbled-building", "container", "crate-stack", "watchtower", "pylon", "wreck-car", "dead-tree", "barrel-cluster", "rubble-pile", "barricade", "tire-stack", "road-sign", "crag", "barrel", "crate"]
+MATERIAL_PRESET_NAMES: readonly ["metal", "chrome", "gold", "plastic", "rubber", "matte", "emissive", "glass", "toon", "matcap", "holographic", "triplanar"]
+MATERIAL_PRESETS: { readonly metal: { readonly color: "#b8bcc4"
+PART_DEFAULTS: { readonly size: 1
+plank: (length: number, thickness: number, width: number) => THREE.BufferGeometry
+PROP_DEFINITIONS: readonly PropDefinition[]
+PROP_EXAMPLES: readonly PropExample[]
+PROP_PRESET_NAMES: readonly string[]
+PROP_SPEC_GRAMMAR: string
+PROP_SPEC_SCHEMA: JsonSchema
+SHAPE_NAMES: readonly ["box", "sphere", "cylinder", "cone", "pyramid", "prism", "capsule", "torus", "knot", "crystal", "rock", "wedge", "plane", "disc", "ring"]
+SPEC_LIMITS: { /** Parts per prop, before repetition. */ readonly maxParts: 32
+SURFACE_NAMES: readonly ["matte", "metal", "chrome", "gold", "plastic", "rubber", "glass", "emissive"]
+TEXTURE_PRESET_NAMES: readonly ["grid", "noise", "gradient", "seamless-noise", "matcap"]
+```
+
+**classes** (1)
+
+```ts
+Propextends THREE.Group implements Disposable { #private
+```
+
+**types** (102): `AlphaFieldOptions`, `AsciiRasterOptions`, `AsciiRasterResult`, `AsciiView`, `AsciiViewName`, `AssetManifestEntry`, `AssetMaterialPresetName`, `Axis`, `AxisName`, `BoatOptions`, `BuildAttempt`, `BuildPropOptions`, `Claim`, `CloudOptions`, `CompositePart`, `ConnectionGraph`, `ConnectionGraphOptions`, `CreatePropAttempt`, `CreatePropInput`, `CreatePropToolOptions`, `CrystalOptions`, `ExtrudeAlongPathOptions`, `ExtrudeOptions`, `FacetColorOptions`, `GeneratePropOptions`, `GradientTextureOptions`, `GridLayout`, `GridTextureOptions`, `GrimeOptions`, `HolographicMaterialOptions`, `InfiniteGround`, `InfiniteGroundOptions`, `InstancePlace`, `InstancePlacement`, `InstancedPropOptions`, `InstancedPropResult`, `IssueLevel`, `JsonSchema`, `KitOptions`, `KitPaletteKey`, `KitPropName`, `LampPostOptions`, `LatheOptions`, `MatcapTextureOptions`, `MaterialPreset`, `MaterialPresetParams`, `MergePartsOptions`, `NoiseDisplaceOptions`, `NoiseTextureOptions`, `NormalizedPart`, `NormalizedPropSpec`, `NormalizedRepeat`, `PaletteAuditEntry`, `ParamSpec`, `ParamSpecMap`, `ParamValue`, `PartOptions`, `PartSpec`, `PathTubeOptions`, `Placement`, `PlacementField`, `PlacementFieldOptions`, `PlacementQuery`, `ProceduralTextureOptions`, `PromptOptions`, `PropCompletion`, `PropCompletionRequest`, `PropComposite`, `PropDefinition`, `PropExample`, `PropGeneration`, `PropOptions`, `PropPresetRequest`, `PropRegistry`, `PropReview`, `PropSpec`, `PropTool`, `PropToolResult`, `RadialLayout`, `RepeatMode`, `RepeatSpec`, `ResolvedPropOptions`, `RibbonPoint`, `RibbonSection`, `RibbonVertex`, `RockGeometryOptions`, `RockOptions`, `ScatterOptions`, `ScatterResult`, `SeamlessNoiseTextureOptions`, `ShapeName`, `SpecIssue`, `SpecReview`, `SpecVec3`, `SurfaceRibbonOptions`, `TexturePresetName`, `TickableMaterial`, `ToonMaterialOptions`, `Transform`, `TransportFrames`, `TreeOptions`, `TriplanarMaterialOptions`
+
+### `threejs-scene/modules/post`
+
+the post-processing module and its composer
+
+
+**functions** (36)
+
+```ts
+createAfterimage(options?: AfterimageOptions): Pass
+createAnamorphic(options?: AnamorphicOptions): AnamorphicPass
+createAo(ctx: WebGlPassContext, options?: AoOptions): Pass
+createBlockDisplacementPass(): ShaderPass
+createBloom(options?: BloomOptions): Pass
+createBurnInPass(options?: BurnInOptions): BurnInPass
+createChromaticAberration(options?: ChromaticAberrationOptions): Pass
+createCinematicLUT(size?: number, options?: CinematicLutOptions): THREE.Data3DTexture
+createComposer(options: ComposerOptions): ComposerHandle
+createCrtPass(options?: CrtOptions): CrtPass
+createDof(ctx: WebGlPassContext, options?: DofOptions): BokehPass
+createEmissiveBloom(ctx: WebGlPassContext, options?: EmissiveBloomOptions): SelectiveBloomHandle
+createFilmGrainPass(options?: FilmGrainOptions): ShaderPass
+createFXAA(_options?: FXAAOptions): Pass
+createGodRaysPass(options?: GodRaysOptions): GodRaysPass
+createGradePass(options?: GradePassOptions): GradePass
+createHudBeamTransition(options?: HudBeamOptions): HudBeamTransition
+createLensflare(options?: LensflareOptions): Lensflare
+createLensingPass(options?: LensingOptions): LensingPass
+createLUT(options?: LUTOptions): Pass
+createMotionBlur(options?: MotionBlurOptions): MotionBlurPass
+createOutline(ctx: WebGlPassContext, options?: OutlineOptions): Pass
+createPixel(ctx: WebGlPassContext, options?: PixelOptions): Pass
+createRadialBlur(options?: RadialBlurOptions): Pass
+createRetroPass(options?: RetroOptions): RetroPass
+createRgbShiftPass(): ShaderPass
+createScanCorruptionPass(): ShaderPass
+createSelectiveBloom(ctx: WebGlPassContext, options?: SelectiveBloomOptions): SelectiveBloomHandle
+createSMAA(_options?: SMAAOptions): Pass
+createSobel(options?: SobelOptions): SobelPass
+createSsaa(ctx: WebGlPassContext, options?: SsaaOptions): Pass
+createSsr(ctx: WebGlPassContext, options?: SsrOptions): Pass
+createStereoRenderer(renderer: THREE.WebGLRenderer, mode: StereoMode, options?: StereoSizeOptions): StereoRenderer
+createTraa(ctx: WebGlPassContext, options?: TraaOptions): Pass
+crtCorrectPointer(ndcX: number, ndcY: number, curvature: number): CrtCorrectPointerReturnType
+postProcessing<S extends object = Record<string, unknown>>(options?: PostProcessingOptions): AppModule<S>
+```
+
+**values** (7)
+
+```ts
+BLOOM_LAYER= 1
+FULLSCREEN_VERTEX= "\n varying vec2 vUv;\n void main () {\n vUv = uv;\n gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n }\n"
+GLSL_CHROMATIC= "\n vec3 chromaticSample (sampler2D tex, vec2 uv, vec2 off) {\n return vec3(\n texture2D(tex, uv + off).r,\n texture2D(tex, uv).g,\n texture2D(tex, uv - off).b\n );\n }\n"
+GLSL_GRAIN= "\n float grain (vec2 uv, float t, float intensity) {\n return (fract(sin(dot(uv * 1024.0 + t, vec2(127.1, 311.7))) * 43758.5453) - 0.5) * intensity;\n }\n"
+GLSL_HASH= "\n float hash21 (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n float hash11 (float n) { return fract(sin(n) * 43758.5453); }\n"
+GLSL_VIGNETTE= "\n float vignette (vec2 uv, float amount) {\n return 1.0 - amount * smoothstep(0.2, 0.85, length(uv - 0.5));\n }\n"
+GradeShader: { uniforms: { tDiffuse: { value: null
+```
+
+**classes** (1)
+
+```ts
+BurnInPassextends Pass { private historyA
+```
+
+**types** (51): `AfterimageOptions`, `AnamorphicOptions`, `AnamorphicPass`, `AoOptions`, `BloomOptions`, `BurnInOptions`, `ChromaticAberrationOptions`, `CinematicLutOptions`, `ComposerHandle`, `ComposerOptions`, `CrtOptions`, `CrtPass`, `DofOptions`, `EffectContext`, `EmissiveBloomOptions`, `FXAAOptions`, `FilmGrainOptions`, `GodRaysOptions`, `GodRaysPass`, `GradePass`, `GradePassOptions`, `HudBeamOptions`, `HudBeamTransition`, `LUTOptions`, `LensflareElementSpec`, `LensflareOptions`, `LensingOptions`, `LensingPass`, `MotionBlurOptions`, `MotionBlurPass`, `OutlineOptions`, `PixelOptions`, `PostProcessingBloom`, `PostProcessingOptions`, `RadialBlurOptions`, `Resizable`, `RetroOptions`, `RetroPass`, `SMAAOptions`, `SelectiveBloomHandle`, `SelectiveBloomOptions`, `SobelOptions`, `SobelPass`, `SsaaOptions`, `SsrOptions`, `StereoMode`, `StereoRenderer`, `StereoSizeOptions`, `TraaOptions`, `WebGlEffect`, `WebGlPassContext`
+
+### `threejs-scene/modules/post/webgl`
+
+the individual passes
+
+
+**functions** (25)
+
+```ts
+createAfterimage(options?: AfterimageOptions): Pass
+createAnamorphic(options?: AnamorphicOptions): AnamorphicPass
+createAo(ctx: WebGlPassContext, options?: AoOptions): Pass
+createBloom(options?: BloomOptions): Pass
+createBurnInPass(options?: BurnInOptions): BurnInPass
+createChromaticAberration(options?: ChromaticAberrationOptions): Pass
+createCrtPass(options?: CrtOptions): CrtPass
+createDof(ctx: WebGlPassContext, options?: DofOptions): BokehPass
+createEmissiveBloom(ctx: WebGlPassContext, options?: EmissiveBloomOptions): SelectiveBloomHandle
+createFXAA(_options?: FXAAOptions): Pass
+createLensflare(options?: LensflareOptions): Lensflare
+createLensingPass(options?: LensingOptions): LensingPass
+createLUT(options?: LUTOptions): Pass
+createMotionBlur(options?: MotionBlurOptions): MotionBlurPass
+createOutline(ctx: WebGlPassContext, options?: OutlineOptions): Pass
+createPixel(ctx: WebGlPassContext, options?: PixelOptions): Pass
+createRadialBlur(options?: RadialBlurOptions): Pass
+createRetroPass(options?: RetroOptions): RetroPass
+createSelectiveBloom(ctx: WebGlPassContext, options?: SelectiveBloomOptions): SelectiveBloomHandle
+createSMAA(_options?: SMAAOptions): Pass
+createSobel(options?: SobelOptions): SobelPass
+createSsaa(ctx: WebGlPassContext, options?: SsaaOptions): Pass
+createSsr(ctx: WebGlPassContext, options?: SsrOptions): Pass
+createTraa(ctx: WebGlPassContext, options?: TraaOptions): Pass
+crtCorrectPointer(ndcX: number, ndcY: number, curvature: number): CrtCorrectPointerReturnType
+```
+
+**values** (1)
+
+```ts
+BLOOM_LAYER= 1
+```
+
+**classes** (1)
+
+```ts
+BurnInPassextends Pass { private historyA
+```
+
+**types** (35): `AfterimageOptions`, `AnamorphicOptions`, `AnamorphicPass`, `AoOptions`, `BloomOptions`, `BurnInOptions`, `ChromaticAberrationOptions`, `CrtOptions`, `CrtPass`, `DofOptions`, `EmissiveBloomOptions`, `FXAAOptions`, `LUTOptions`, `LensflareElementSpec`, `LensflareOptions`, `LensingOptions`, `LensingPass`, `MotionBlurOptions`, `MotionBlurPass`, `OutlineOptions`, `PixelOptions`, `RadialBlurOptions`, `Resizable`, `RetroOptions`, `RetroPass`, `SMAAOptions`, `SelectiveBloomHandle`, `SelectiveBloomOptions`, `SobelOptions`, `SobelPass`, `SsaaOptions`, `SsrOptions`, `TraaOptions`, `WebGlEffect`, `WebGlPassContext`
+
+### `threejs-scene/modules/lighting`
+
+standard light rigs
+
+
+**functions** (1)
+
+```ts
+standardLighting<S extends object = Record<string, unknown>>(options?: LightingOptions): AppModule<S>
+```
+
+**types** (4): `LightingEnvOptions`, `LightingHemiOptions`, `LightingOptions`, `LightingSunOptions`
+
+### `threejs-scene/modules/orbit`
+
+orbit controls as a module
+
+
+**functions** (1)
+
+```ts
+orbitControls<S extends object = Record<string, unknown>>(options?: OrbitOptions): AppModule<S>
+```
+
+**types** (1): `OrbitOptions`
+
+### `threejs-scene/modules/physics`
+
+fixed-step rigid bodies, cloth, liquid. Needs the optional `cannon-es` peer
+
+
+**functions** (5)
+
+```ts
+addGroundPlane(physics: PhysicsApi, height?: number): CANNON.Body
+addStaticBox(physics: PhysicsApi, size: Vec3, at: Vec3, rotate?: Vec3): CANNON.Body
+createCloth(physics: PhysicsApi, options?: ClothOptions): Cloth
+createLiquid(physics: PhysicsApi, options?: LiquidOptions): Liquid
+physicsWorld<S extends object = Record<string, unknown>>(options?: PhysicsWorldOptions): PhysicsHandle<S>
+```
+
+**types** (13): `BodyOptions`, `BodyShape`, `Cloth`, `ClothOptions`, `ClothPinning`, `Liquid`, `LiquidOptions`, `LiquidRenderMode`, `LiquidSolver`, `PhysicsApi`, `PhysicsHandle`, `PhysicsWorldOptions`, `StepCallback`
+
+---
+
+Generated by `scripts/gen-llms.ts` from `dist/**/*.d.ts` at version 0.6.1.
+Regenerate after changing any public signature: `bun scripts/gen-llms.ts`.
