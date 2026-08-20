@@ -21,7 +21,8 @@ export type { FrameLoopOptions } from './time/loop.js'
 
 // state — what the world is
 export { createStore } from './state/store.js'
-export { createSeededRng, hash2, hash3, lerp, mulberry32, smoothstep } from './state/rng.js'
+export { createSeededRng, hash2, hash3, lerp, mulberry32, smoothstep, valueNoise1d } from './state/rng.js'
+export { readPath, writePath, readNumberPath, readTextPath } from './state/path.js'
 export type { Store, Reducer, StoreListener } from './state/store.js'
 
 // camera — prebuilt rigs for createApp's `camera` option
@@ -35,7 +36,8 @@ export type { RendererOptions } from './render/renderer.js'
 export type { ResizeHandler } from './render/resize.js'
 
 // lifecycle — teardown
-export { disposeScene, disposeMaterial } from './lifecycle/dispose.js'
+export { disposeScene, disposeMaterial, disposeMesh } from './lifecycle/dispose.js'
+export type { DisposeMeshOptions } from './lifecycle/dispose.js'
 
 // input — how intent enters the system
 export { attachPointerGesture } from './input/pointer-gesture.js'

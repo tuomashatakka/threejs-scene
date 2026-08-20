@@ -46,6 +46,19 @@ export type { FacetColorOptions, GrimeOptions } from './facets.js'
 export { part, mergeParts } from './parts.js'
 export type { PartOptions, MergePartsOptions } from './parts.js'
 
+// terse constructors for the primitives a prop is built from
+export { box, cyl, cone, ball, hedron, plank, blade, deg, spread } from './primitives.js'
+
+// seeing a built geometry without a browser — the other half of reviewProp
+export { rasterizeAscii, auditPalette, ASCII_VIEWS, ASCII_SHADES } from './ascii.js'
+export type {
+  AsciiRasterOptions,
+  AsciiRasterResult,
+  AsciiView,
+  AsciiViewName,
+  PaletteAuditEntry,
+} from './ascii.js'
+
 // the wasteland kit — sixteen props, each one merged geometry
 export { buildKitGeometry, kitProp, KIT_PROP_NAMES, KIT_PALETTE } from './kit.js'
 export type { KitOptions, KitPaletteKey, KitPropName } from './kit.js'

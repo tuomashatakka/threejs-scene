@@ -160,9 +160,40 @@ JSON-serializable inventory of every option default, description, and tag.
 
 Also here: eight PBR presets plus toon, procedural matcap, holographic, and
 triplanar materials; five DOM-free procedural textures; shape profiles,
-extrusion/lathe/path tubes, twist/taper/bend/noise and topology modifiers,
-merging/layout/bounds/connection/infinite-ground helpers; owned prop registries,
-composites, and single- or multi-part instancing.
+extrusion/lathe/path tubes, surface ribbons, twist/taper/bend/noise and topology
+modifiers, merging/layout/bounds/connection/infinite-ground helpers; terse
+primitive constructors (`box`, `cyl`, `cone`, `ball`, `hedron`, `plank`,
+`blade`); owned prop registries, composites, and single- or multi-part
+instancing.
+
+### Seeing a prop without a browser
+
+`validatePropSpec` says whether a spec is legal and `reviewProp` measures
+whether the result floats, detaches or buries itself — but neither says what it
+*looks* like, which leaves a model authoring geometry reasoning blind.
+`rasterizeAscii` draws one geometry as text, with a real z-buffer, in about ten
+milliseconds and with no canvas, GPU or image file anywhere in the loop:
+
+```ts
+import { mergeParts, part, box, cyl, rasterizeAscii, auditPalette } from 'threejs-scene/modules/assets'
+
+const geometry = mergeParts([
+  part(box(2, 1.2, 3), { color: '#8a5a3b' }),
+  part(cyl(0.1, 0.1, 1.6, 5), { at: [ 0.7, 1.1, 0 ], color: '#3d3d42' }),
+])
+
+for (const view of [ 'iso', 'right' ] as const)
+  console.log(rasterizeAscii(geometry, { view, cols: 72 }).lines.join('\n'))
+
+// which palette entry each facet came from, and the height band it covers
+console.log(auditPalette(geometry, { timber: '#8a5a3b', iron: '#3d3d42' }))
+```
+
+`ASCII_VIEWS` names the six angles worth looking from — `iso` because it is the
+angle an isometric scene is played at, the four elevations because they are the
+ones you can measure from. Both functions read `position` as a triangle soup,
+which is exactly what `mergeParts` emits; call `.toNonIndexed()` first on
+anything indexed.
 
 ### The low-poly prop kit
 

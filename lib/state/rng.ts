@@ -45,6 +45,23 @@ export function smoothstep (edge0: number, edge1: number, value: number): number
   return t * t * (3 - 2 * t)
 }
 
+/**
+ * Smooth 1D value noise in [0, 1), sampled every `span` units along `at`.
+ *
+ * `hash2` is a hash, not a field: consecutive units are unrelated values, so
+ * anything jittered directly by it comes out as gravel rather than as a line
+ * that wanders. Interpolating between whole cells with `smoothstep` is what
+ * makes it a field. `phase` picks an independent stream, so two features can
+ * wander off the same coordinate without wandering together.
+ */
+export function valueNoise1d (at: number, span: number, phase = 0): number {
+  const scaled = at / span
+  const cell   = Math.floor(scaled)
+  const blend  = smoothstep(0, 1, scaled - cell)
+
+  return hash2(cell, phase) * (1 - blend) + hash2(cell + 1, phase) * blend
+}
+
 // FNV-1a string hash, used to derive a stable sub-seed from a fork label.
 function hashLabel (label: string, salt: number): number {
   let h = (2166136261 ^ salt) >>> 0

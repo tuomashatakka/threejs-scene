@@ -1,0 +1,71 @@
+name: Publish
+
+# Manual only. A release is a decision, not a consequence of a push — and the
+# version in package.json is bumped by hand, so a tag-or-push trigger would
+# either republish the same version or publish one nobody chose.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: npm dist-tag to publish under
+        required: false
+        default: latest
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # npm does the publishing (prepublishOnly is an npm lifecycle hook), so
+      # the registry auth has to be wired into npm's rc, not bun's.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - run: bun install --frozen-lockfile
+
+      - name: Read the version being published
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to republish an existing version
+        run: |
+          if npm view "threejs-scene@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
+            echo "threejs-scene@${{ steps.pkg.outputs.version }} is already on the registry."
+            echo "Bump the version in package.json and add a CHANGELOG entry first."
+            exit 1
+          fi
+
+      # These four are what prepublishOnly re-runs. Running them as named steps
+      # first is purely so a failure is legible in the log rather than buried in
+      # publish output.
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+      - run: bun run build
+
+      - name: Check the published shape
+        run: |
+          bunx publint
+          bunx --bun @arethetypeswrong/cli --pack .
+
+      - name: Publish
+        run: npm publish --access public --tag "${{ inputs.tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Tags have drifted from releases before — only v0.1.0 ever got one. Doing
+      # it here is what keeps them honest from now on.
+      - name: Tag the release
+        run: |
+          git tag "v${{ steps.pkg.outputs.version }}"
+          git push origin "v${{ steps.pkg.outputs.version }}"

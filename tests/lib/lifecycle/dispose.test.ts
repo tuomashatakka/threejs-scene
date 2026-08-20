@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import { disposeMaterial, disposeScene } from 'Δ/lifecycle/dispose'
+import { disposeMaterial, disposeMesh, disposeScene } from 'Δ/lifecycle/dispose'
 
 
 function makeTexture (): THREE.DataTexture {
@@ -76,6 +76,60 @@ describe('disposeScene', () => {
     const spies = mats.map(m => vi.spyOn(m, 'dispose'))
 
     disposeScene(mesh)
+    for (const spy of spies)
+      expect(spy).toHaveBeenCalled()
+  })
+})
+
+describe('disposeMesh', () => {
+  // The line most often forgotten when this is written out by hand. A disposed
+  // mesh left in the graph still gets traversed.
+  it('detaches from the parent', () => {
+    const parent = new THREE.Group()
+    const mesh   = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial())
+
+    parent.add(mesh)
+    expect(parent.children).toHaveLength(1)
+
+    disposeMesh(mesh)
+    expect(parent.children).toHaveLength(0)
+    expect(mesh.parent).toBeNull()
+  })
+
+  it('frees the geometry and the material', () => {
+    const geometry = new THREE.BoxGeometry()
+    const material = new THREE.MeshBasicMaterial()
+    const mesh     = new THREE.Mesh(geometry, material)
+
+    const geo = vi.spyOn(geometry, 'dispose')
+    const mat = vi.spyOn(material, 'dispose')
+
+    disposeMesh(mesh)
+    expect(geo).toHaveBeenCalled()
+    expect(mat).toHaveBeenCalled()
+  })
+
+  // One material shared across a kit is the point of a kit; disposing it from
+  // one owner's teardown blanks every neighbour still drawing with it.
+  it('leaves a pooled material alone when asked', () => {
+    const geometry = new THREE.BoxGeometry()
+    const material = new THREE.MeshBasicMaterial()
+    const mesh     = new THREE.Mesh(geometry, material)
+
+    const geo = vi.spyOn(geometry, 'dispose')
+    const mat = vi.spyOn(material, 'dispose')
+
+    disposeMesh(mesh, { keepMaterial: true })
+    expect(geo).toHaveBeenCalled()
+    expect(mat).not.toHaveBeenCalled()
+  })
+
+  it('handles material arrays', () => {
+    const mats  = [ new THREE.MeshBasicMaterial(), new THREE.MeshBasicMaterial() ]
+    const mesh  = new THREE.Mesh(new THREE.BoxGeometry(), mats)
+    const spies = mats.map(m => vi.spyOn(m, 'dispose'))
+
+    disposeMesh(mesh)
     for (const spy of spies)
       expect(spy).toHaveBeenCalled()
   })
