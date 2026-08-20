@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="a source-grounded catalog of potential modules, functions, props, and materials for threejs-scene">
+  <title>threejs-scene potential module catalog</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --color-bg: #0d1010;
+      --color-surface: #151a19;
+      --color-surface-raised: #1b2220;
+      --color-line: #2b3532;
+      --color-line-strong: #46534f;
+      --color-ink: #eef4f1;
+      --color-muted: #a5b1ad;
+      --color-accent: #b9fbc0;
+      --color-accent-strong: #6ee7a0;
+      --color-warm: #ffd59a;
+      --color-blue: #9cd7ff;
+      --color-violet: #d8b4fe;
+      --color-danger: #ffaaa5;
+      --radius-small: 0.45rem;
+      --radius-medium: 0.85rem;
+      --shadow: 0 1rem 3rem rgb(0 0 0 / 0.22);
+      --measure: 82rem;
+      font-family: ui-monospace, "sfmono-regular", "sf mono", menlo, consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-width: 20rem;
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% -10%, rgb(110 231 160 / 0.13), transparent 32rem),
+        radial-gradient(circle at 95% 8%, rgb(156 215 255 / 0.09), transparent 30rem),
+        var(--color-bg);
+      color: var(--color-ink);
+      line-height: 1.55;
+    }
+
+    body > header,
+    main,
+    body > footer {
+      width: min(calc(100% - 2rem), var(--measure));
+      margin-inline: auto;
+    }
+
+    body > header {
+      padding-block: clamp(3rem, 9vw, 7rem) 2rem;
+    }
+
+    body > header > p {
+      max-width: 64rem;
+      color: var(--color-muted);
+      font-size: clamp(1rem, 2.2vw, 1.2rem);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin-block: 0;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+    }
+
+    h1 {
+      max-width: 18ch;
+      font-size: clamp(2.7rem, 8vw, 6.5rem);
+    }
+
+    h2 {
+      font-size: clamp(1.7rem, 4vw, 2.7rem);
+    }
+
+    h3 {
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+    }
+
+    p,
+    dd {
+      text-wrap: pretty;
+    }
+
+    a {
+      color: var(--color-accent);
+      text-underline-offset: 0.2em;
+    }
+
+    a:hover {
+      color: var(--color-ink);
+    }
+
+    code,
+    kbd,
+    samp {
+      font: inherit;
+    }
+
+    code {
+      overflow-wrap: anywhere;
+      color: var(--color-blue);
+    }
+
+    nav ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      padding: 0;
+      list-style: none;
+    }
+
+    nav a {
+      display: inline-block;
+      padding: 0.45rem 0.7rem;
+      border: 1px solid var(--color-line);
+      border-radius: 999px;
+      background: rgb(255 255 255 / 0.025);
+      color: var(--color-muted);
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      border-color: var(--color-accent-strong);
+      color: var(--color-ink);
+    }
+
+    main {
+      display: grid;
+      gap: 4rem;
+      padding-block: 2rem 5rem;
+    }
+
+    section {
+      scroll-margin-top: 1rem;
+    }
+
+    section > header {
+      display: grid;
+      gap: 0.65rem;
+      margin-bottom: 1.4rem;
+    }
+
+    section > header p {
+      max-width: 72rem;
+      margin: 0;
+      color: var(--color-muted);
+    }
+
+    dl[data-metrics] {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      gap: 0.8rem;
+      margin: 0 0 1rem;
+    }
+
+    dl[data-metrics] div {
+      min-height: 8rem;
+      padding: 1rem;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-medium);
+      background: linear-gradient(145deg, rgb(255 255 255 / 0.035), transparent);
+      box-shadow: var(--shadow);
+    }
+
+    dl[data-metrics] dt {
+      color: var(--color-muted);
+      font-size: 0.76rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    dl[data-metrics] dd {
+      margin: 0.5rem 0 0;
+      font-size: clamp(1.65rem, 4vw, 2.8rem);
+      line-height: 1;
+    }
+
+    details {
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-medium);
+      background: var(--color-surface);
+    }
+
+    summary {
+      padding: 0.9rem 1rem;
+      cursor: pointer;
+      color: var(--color-accent);
+      font-weight: 700;
+    }
+
+    details > :not(summary) {
+      margin-inline: 1rem;
+    }
+
+    details > :last-child {
+      margin-bottom: 1rem;
+    }
+
+    form[data-filters] {
+      position: sticky;
+      z-index: 5;
+      top: 0;
+      display: grid;
+      grid-template-columns: minmax(15rem, 2fr) repeat(3, minmax(9rem, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 0.9rem;
+      padding: 0.8rem;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-medium);
+      background: rgb(13 16 16 / 0.94);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(1rem);
+    }
+
+    label {
+      display: grid;
+      gap: 0.25rem;
+      color: var(--color-muted);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 2.7rem;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid var(--color-line-strong);
+      border-radius: var(--radius-small);
+      background: var(--color-surface);
+      color: var(--color-ink);
+      font: inherit;
+    }
+
+    input:focus,
+    select:focus {
+      outline: 2px solid var(--color-accent-strong);
+      outline-offset: 2px;
+    }
+
+    output[data-count] {
+      display: block;
+      margin: 0 0 0.7rem;
+      color: var(--color-muted);
+    }
+
+    [data-table-scroll] {
+      overflow-x: auto;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-medium);
+      background: var(--color-surface);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    caption {
+      padding: 0.8rem 1rem;
+      color: var(--color-muted);
+      text-align: left;
+    }
+
+    th,
+    td {
+      padding: 0.8rem 0.9rem;
+      border-bottom: 1px solid var(--color-line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 4.45rem;
+      z-index: 2;
+      background: #171d1b;
+      color: var(--color-muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr:hover {
+      background: rgb(185 251 192 / 0.035);
+    }
+
+    td[data-functions] {
+      min-width: 22rem;
+      max-width: 34rem;
+    }
+
+    td[data-summary] {
+      min-width: 22rem;
+      max-width: 34rem;
+      color: var(--color-muted);
+    }
+
+    td[data-sources] {
+      min-width: 17rem;
+    }
+
+    [data-badge] {
+      display: inline-block;
+      margin: 0 0.25rem 0.25rem 0;
+      padding: 0.15rem 0.45rem;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      color: var(--color-muted);
+      font-size: 0.68rem;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    [data-badge="port"],
+    [data-badge="p0"],
+    [data-badge="public"] {
+      color: var(--color-accent);
+    }
+
+    [data-badge="adapt"],
+    [data-badge="p1"],
+    [data-badge="mixed"] {
+      color: var(--color-warm);
+    }
+
+    [data-badge="included"],
+    [data-badge="overlap"] {
+      color: var(--color-blue);
+    }
+
+    [data-badge="experimental"] {
+      color: var(--color-violet);
+    }
+
+    [data-badge="keep-app"],
+    [data-badge="internal"] {
+      color: var(--color-muted);
+    }
+
+    [data-badge="p2"],
+    [data-badge="p3"] {
+      color: #d2dbd8;
+    }
+
+    [data-cards] {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+      gap: 0.8rem;
+    }
+
+    [data-cards] article {
+      padding: 1rem;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-medium);
+      background: linear-gradient(155deg, var(--color-surface-raised), var(--color-surface));
+    }
+
+    [data-cards] article p {
+      margin-bottom: 0;
+      color: var(--color-muted);
+      font-size: 0.86rem;
+    }
+
+    [data-cards] article ul {
+      padding-left: 1.2rem;
+    }
+
+    [data-symbols] {
+      min-width: 32rem;
+    }
+
+    [data-symbols] code {
+      display: inline-block;
+      margin: 0 0.35rem 0.35rem 0;
+      padding: 0.12rem 0.3rem;
+      border-radius: 0.25rem;
+      background: rgb(156 215 255 / 0.06);
+    }
+
+    [data-symbols] code[data-overlap="true"] {
+      color: var(--color-accent);
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body > footer {
+      padding-block: 0 4rem;
+      color: var(--color-muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 58rem) {
+      form[data-filters] {
+        position: static;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      form[data-filters] label:first-child {
+        grid-column: 1 / -1;
+      }
+
+      th {
+        position: static;
+      }
+    }
+
+    @media (max-width: 38rem) {
+      body > header,
+      main,
+      body > footer {
+        width: min(calc(100% - 1rem), var(--measure));
+      }
+
+      form[data-filters] {
+        grid-template-columns: 1fr;
+      }
+
+      form[data-filters] label:first-child {
+        grid-column: auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p>source-grounded planning artifact · generated 2026-08-01</p>
+    <h1>threejs-scene potential module catalog</h1>
+    <p>
+      a digest of <code>threejs-scenes</code>, <code>playworld</code>, and
+      <code>meshes</code>, compared against the current package. the first table
+      is the architectural roadmap; the final table is the exhaustive runtime
+      symbol inventory used to build it.
+    </p>
+    <nav aria-label="catalog sections">
+      <ul>
+        <li><a href="#snapshot">snapshot</a></li>
+        <li><a href="#roadmap">roadmap</a></li>
+        <li><a href="#content">props and materials</a></li>
+        <li><a href="#inventory">source inventory</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="snapshot" aria-labelledby="snapshot-title">
+      <header>
+        <h2 id="snapshot-title">snapshot</h2>
+        <p>counts are extracted from top-level runtime declarations; generated mirrors, tests, build output, and dependencies are excluded.</p>
+      </header>
+
+      <dl data-metrics>
+        <div>
+          <dt>source runtime symbols</dt>
+          <dd id="metric-source-symbols">505</dd>
+        </div>
+        <div>
+          <dt>threejs-scenes public symbols</dt>
+          <dd id="metric-v3-symbols">247</dd>
+        </div>
+        <div>
+          <dt>v3 exact-name overlaps</dt>
+          <dd id="metric-v3-overlap">111</dd>
+        </div>
+        <div>
+          <dt>roadmap module families</dt>
+          <dd id="metric-roadmap">48</dd>
+        </div>
+      </dl>
+
+      <details>
+        <summary>how to read this catalog</summary>
+        <p>
+          <strong>included</strong> means the current package already owns the
+          capability. <strong>port</strong> means the source API is already a
+          clean library-shaped candidate. <strong>adapt</strong> means the
+          behavior is reusable but its host or ui coupling should be removed.
+          <strong>keep app</strong> marks a useful reference implementation that
+          should probably remain outside the package. <strong>experimental</strong>
+          is a separate entry point or later decision.
+        </p>
+        <p>
+          an exact-name overlap is lexical evidence only. it does not prove that
+          two implementations have behavioral parity, and identical webgl/webgpu
+          factory names intentionally remain separate candidates.
+        </p>
+      </details>
+    </section>
+
+    <section id="roadmap" aria-labelledby="roadmap-title">
+      <header>
+        <h2 id="roadmap-title">module roadmap</h2>
+        <p>the reusable capability map, including package-boundary guidance and the source functions that would seed each module.</p>
+      </header>
+
+      <form id="roadmap-filters" data-filters>
+        <label>
+          search roadmap
+          <input id="roadmap-search" type="search" placeholder="voxels, camera, material…" autocomplete="off">
+        </label>
+        <label>
+          decision
+          <select id="roadmap-decision">
+            <option value="">all decisions</option>
+            <option value="port">port</option>
+            <option value="adapt">adapt</option>
+            <option value="included">included</option>
+            <option value="keep-app">keep app</option>
+            <option value="experimental">experimental</option>
+          </select>
+        </label>
+        <label>
+          priority
+          <select id="roadmap-priority">
+            <option value="">all priorities</option>
+            <option value="p0">p0</option>
+            <option value="p1">p1</option>
+            <option value="p2">p2</option>
+            <option value="p3">p3</option>
+            <option value="done">done</option>
+            <option value="later">later</option>
+          </select>
+        </label>
+        <label>
+          source
+          <select id="roadmap-source">
+            <option value="">all sources</option>
+            <option value="threejs-scenes">threejs-scenes</option>
+            <option value="playworld/world">playworld/world</option>
+            <option value="playworld/original">playworld/original</option>
+            <option value="playworld/chat">playworld/chat</option>
+            <option value="playworld/original-app">playworld/original-app</option>
+            <option value="meshes/wasteland">meshes/wasteland</option>
+            <option value="meshes/prototype">meshes/prototype</option>
+            <option value="threejs-scene">threejs-scene</option>
+          </select>
+        </label>
+      </form>
+      <output id="roadmap-count" data-count for="roadmap-search roadmap-decision roadmap-priority roadmap-source" aria-live="polite"></output>
+
+      <div data-table-scroll>
+        <table>
+          <caption>candidate module families, decisions, source functions, and boundaries</caption>
+          <thead>
+            <tr>
+              <th scope="col">module family</th>
+              <th scope="col">decision</th>
+              <th scope="col">functions and data</th>
+              <th scope="col">why / package boundary</th>
+              <th scope="col">source</th>
+            </tr>
+          </thead>
+          <tbody id="roadmap-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="content" aria-labelledby="content-title">
+      <header>
+        <h2 id="content-title">props, materials, and authoring surfaces</h2>
+        <p>named content deserves its own inventory: these are user-facing vocabulary, not just implementation helpers.</p>
+      </header>
+
+      <div data-cards>
+        <article>
+          <h3>current prop presets · included</h3>
+          <p><code>crystal, rock, tree, boat, cloud, lamp-post, ruined-block, crumbled-building, container, crate-stack, watchtower, pylon, wreck-car, dead-tree, barrel-cluster, rubble-pile, barricade, tire-stack, road-sign, crag, barrel, crate</code></p>
+        </article>
+
+        <article>
+          <h3>playworld prop variants · port or adapt</h3>
+          <p><code>pine, spruce, birch, deadTree, stump, bush, hedge, flowers, reeds, rock, boulder, house, sauna, kiosk, church, tower, lamp, bench, fence, car, tram, pier, boat</code></p>
+          <p>direct or alias overlap exists for <code>rock</code>, <code>boat</code>, <code>deadTree → dead-tree</code>, and <code>lamp → lamp-post</code>; the other variants add distinct silhouettes or placement semantics.</p>
+        </article>
+
+        <article>
+          <h3>wasteland kit · included</h3>
+          <p>the sixteen named kit geometries from <code>meshes/packages/wasteland</code> are already represented by <code>KIT_PROP_NAMES</code>. keep the wasteland scene modules as integration recipes rather than duplicate factories.</p>
+        </article>
+
+        <article>
+          <h3>current material presets · included</h3>
+          <p><code>metal, chrome, gold, plastic, rubber, matte, emissive, glass</code>, plus toon, procedural matcap, holographic, triplanar, and the shared low-poly kit material.</p>
+        </article>
+
+        <article>
+          <h3>surface-aware prop batching · adapt</h3>
+          <p>playworld splits each prop into <code>body</code>, <code>glow</code>, and <code>shiny</code> surfaces, merges per surface, bakes vertex color plus contact occlusion, and instances each result. this is a reusable batching contract rather than three more material presets.</p>
+        </article>
+
+        <article>
+          <h3>procedural textures · included</h3>
+          <p><code>createGridTexture, createNoiseTexture, createGradientTexture, createSeamlessNoiseTexture, createMatcapTexture</code>. remaining candidates are a generic cache/factory wrapper and <code>createGradientToonMap</code> compatibility.</p>
+        </article>
+
+        <article>
+          <h3>mesh preview looks · keep app</h3>
+          <p>wireframe, solid vertex-color, and iridescent physical-glass modes are excellent authoring previews. package only their reusable material factory if another consumer appears.</p>
+        </article>
+
+        <article>
+          <h3>model-facing authoring · included + extend</h3>
+          <p>the package already validates, builds, reviews, retries, and exposes schema for json prop specs. playworld adds whole-world normalization and scene mutation commands; meshes adds destructive geometry editing and undo snapshots.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="inventory" aria-labelledby="inventory-title">
+      <header>
+        <h2 id="inventory-title">exhaustive source-symbol inventory</h2>
+        <p>every discovered top-level runtime function, class, and exported constant in scope. “overlap” means the current package declares the same runtime name somewhere.</p>
+      </header>
+
+      <form id="inventory-filters" data-filters>
+        <label>
+          search symbols
+          <input id="inventory-search" type="search" placeholder="createChunkManager, props/catalog…" autocomplete="off">
+        </label>
+        <label>
+          source
+          <select id="inventory-source">
+            <option value="">all sources</option>
+            <option value="threejs-scenes">threejs-scenes</option>
+            <option value="playworld/world">playworld/world</option>
+            <option value="playworld/original">playworld/original</option>
+            <option value="playworld/chat">playworld/chat</option>
+            <option value="playworld/original-app">playworld/original-app</option>
+            <option value="meshes/wasteland">meshes/wasteland</option>
+            <option value="meshes/prototype">meshes/prototype</option>
+          </select>
+        </label>
+        <label>
+          visibility
+          <select id="inventory-visibility">
+            <option value="">public and internal</option>
+            <option value="public">public only</option>
+            <option value="internal">internal only</option>
+          </select>
+        </label>
+        <label>
+          overlap
+          <select id="inventory-overlap">
+            <option value="">all overlap states</option>
+            <option value="candidate">candidate names</option>
+            <option value="overlap">exact-name overlap</option>
+            <option value="mixed">mixed module</option>
+          </select>
+        </label>
+      </form>
+      <output id="inventory-count" data-count for="inventory-search inventory-source inventory-visibility inventory-overlap" aria-live="polite"></output>
+
+      <div data-table-scroll>
+        <table>
+          <caption>source modules and their runtime symbols</caption>
+          <thead>
+            <tr>
+              <th scope="col">source</th>
+              <th scope="col">module</th>
+              <th scope="col">state</th>
+              <th scope="col">symbols</th>
+            </tr>
+          </thead>
+          <tbody id="inventory-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      source roots:
+      <code>/Users/mia/Documents/Projects/ai/skills/threejs-scenes</code> ·
+      <code>/Users/mia/Documents/Projects/ai/playworld</code> ·
+      <code>/Users/mia/Documents/Projects/meshes</code> · compared with
+      <code>/Users/mia/Documents/Projects/threejs/threejs-scene</code>
+    </p>
+  </footer>
+
+  <script>
+    const sourceRoots = {
+      "threejs-scenes": "file:///Users/mia/Documents/Projects/ai/skills/threejs-scenes/lib/",
+      "playworld/world": "file:///Users/mia/Documents/Projects/ai/playworld/packages/world/src/",
+      "playworld/original": "file:///Users/mia/Documents/Projects/ai/playworld/packages/original/src/scene/",
+      "playworld/chat": "file:///Users/mia/Documents/Projects/ai/playworld/packages/chat/src/",
+      "playworld/original-app": "file:///Users/mia/Documents/Projects/ai/playworld/packages/original/src/",
+      "meshes/wasteland": "file:///Users/mia/Documents/Projects/meshes/packages/wasteland/src/",
+      "meshes/prototype": "file:///Users/mia/Documents/Projects/meshes/public/",
+      "threejs-scene": "file:///Users/mia/Documents/Projects/threejs/threejs-scene/"
+    }
+
+    const roadmap = [
+      {
+        name: "deterministic app core",
+        area: "core",
+        decision: "included",
+        priority: "done",
+        functions: ["createApp", "defineModule", "createClock", "createFrameLoop", "createStore", "createSeededRng", "disposeScene", "attachPointerGesture"],
+        summary: "the package already owns the small composition root, fixed or variable stepping, seeded state, input, rendering, and explicit teardown.",
+        boundary: "keep this surface small; new systems should arrive as modules or standalone factories.",
+        sources: [["threejs-scene", "lib/index.ts"], ["threejs-scenes", "core/app.ts"]]
+      },
+      {
+        name: "procedural generation core",
+        area: "procedural",
+        decision: "port",
+        priority: "p0",
+        functions: ["createNoise3D", "poissonDisk", "createInstancedField"],
+        summary: "seeded simplex or fbm noise, minimum-distance scatter, and one-draw-call placement are the missing foundation shared by playworld, the old package, and mesh scenes.",
+        boundary: "port the deterministic math and transforms; keep world-specific land, water, and shoreline predicates in consumers.",
+        sources: [["threejs-scenes", "procedural/noise.ts"], ["threejs-scenes", "procedural/poisson-disk.ts"], ["playworld/world", "procedural/instances.ts"]]
+      },
+      {
+        name: "animation clips and controller",
+        area: "animation",
+        decision: "port",
+        priority: "p1",
+        functions: ["numberTrack", "vectorTrack", "quaternionTrack", "trackFromKeyframes", "clipFromTracks", "spinClip", "bobClip", "pulseScaleClip", "combineClips", "createAnimationController"],
+        summary: "programmatic clips and mixer ownership are broadly reusable and are already consumed by the wasteland recipe.",
+        boundary: "make the controller an app module or explicit disposable; do not reintroduce a second global frame loop.",
+        sources: [["threejs-scenes", "animation/clips.ts"], ["threejs-scenes", "animation/mixer.ts"]]
+      },
+      {
+        name: "particle emitters and curve baking",
+        area: "particles",
+        decision: "port",
+        priority: "p1",
+        functions: ["createEmitter", "createGpuEmitter", "createParticleEmitter", "sampleShape", "sampleCurve", "bakeCurve", "bakeCurveTexture"],
+        summary: "cpu, instanced, and gpu particle paths cover smoke, ash, sparks, weather, trails, and high-count fields.",
+        boundary: "ship cpu and instanced emission first; isolate gpu computation behind a separate subpath and quality gate.",
+        sources: [["threejs-scenes", "particles/emitter.ts"], ["threejs-scenes", "particles/gpu-emitter.ts"], ["threejs-scenes", "particles/cpu-particles.ts"], ["threejs-scenes", "particles/curves.ts"]]
+      },
+      {
+        name: "voxel storage, meshing, and chunks",
+        area: "voxels",
+        decision: "port",
+        priority: "p1",
+        functions: ["VoxelChunk", "greedyMesh", "createChunkManager"],
+        summary: "compact voxel storage plus greedy meshing and pooled chunk streaming unlock editable block worlds without per-voxel meshes.",
+        boundary: "keep data and meshing dom-free; expose dirty-boundary hooks instead of embedding an editor.",
+        sources: [["threejs-scenes", "voxels/voxel-data.ts"], ["threejs-scenes", "voxels/greedy-mesh.ts"], ["threejs-scenes", "voxels/chunk-manager.ts"]]
+      },
+      {
+        name: "model loading and cache",
+        area: "assets",
+        decision: "port",
+        priority: "p1",
+        functions: ["createGLTFLoader", "loadGLTF", "FORMAT_LOADERS", "createModelCache", "loadModel", "clearModelCache"],
+        summary: "a disposable loader and clone-safe model cache fills the current package gap between procedural props and external assets.",
+        boundary: "keep format adapters optional and avoid a singleton cache that cannot be disposed per app.",
+        sources: [["threejs-scenes", "loaders/gltf.ts"], ["threejs-scenes", "loaders/model-registry.ts"]]
+      },
+      {
+        name: "quality presets and device tier",
+        area: "core",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["QUALITY_PRESETS", "detectTier", "getQualitySettings", "detectQuality"],
+        summary: "pixel ratio, antialiasing, shadows, post effects, chunks, and particles need one coherent budget selected before resources are built.",
+        boundary: "return immutable settings; consumers decide which systems to mount. include explicit overrides for tests and accessibility.",
+        sources: [["threejs-scenes", "core/quality.ts"], ["playworld/world", "quality.ts"]]
+      },
+      {
+        name: "resilient browser lifecycle",
+        area: "core",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["attachLifecycle"],
+        summary: "playworld handles context loss, drawing-buffer collapse, frame watchdogs, page visibility, and deterministic rebuild from state.",
+        boundary: "the package should emit lifecycle signals and stop work; rebuilding application state remains the host responsibility.",
+        sources: [["playworld/world", "modules/lifecycle.ts"]]
+      },
+      {
+        name: "camera and scene scaffolds",
+        area: "camera",
+        decision: "port",
+        priority: "p1",
+        functions: ["createIsoScaffold", "createOrbitScaffold", "createTppScaffold", "createRailsScaffold", "createFpsScaffold"],
+        summary: "one-call composition recipes remove repeated camera, input, resize, and module wiring while preserving the small app core.",
+        boundary: "publish these as optional scaffold factories built only from public package APIs.",
+        sources: [["threejs-scenes", "scaffold/iso.ts"], ["threejs-scenes", "scaffold/orbit.ts"], ["threejs-scenes", "scaffold/tpp.ts"], ["threejs-scenes", "scaffold/rails.ts"], ["threejs-scenes", "scaffold/fps.ts"]]
+      },
+      {
+        name: "camera motion and path runner",
+        area: "camera",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["createCameraController", "createPathCamera", "createPathRunner", "lerpAngle", "tupleToVector3", "vector3ToTuple", "targetFromObject"],
+        summary: "damped targets, cinematic catmull-rom paths, stop-aware easing, ping-pong or looping, and serializable poses complement iso and follow rigs.",
+        boundary: "keep path timing pure and camera-object mutation in a disposable rig.",
+        sources: [["threejs-scenes", "camera/camera-controller.ts"], ["threejs-scenes", "camera/path-camera.ts"], ["playworld/world", "modules/camera-path.ts"], ["threejs-scenes", "camera/targets.ts"]]
+      },
+      {
+        name: "scene picking, events, and annotations",
+        area: "composition",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["pickTopLevel", "pick", "createClickGuard", "bindSceneEvents", "attachAnnotationSystem"],
+        summary: "raycast picking, click-versus-drag guarding, declarative pointer events, and projected annotation anchors form one interaction layer.",
+        boundary: "ship raycast and event primitives; keep annotation dom rendering in an adapter.",
+        sources: [["threejs-scenes", "architecture/pick.ts"], ["threejs-scenes", "compose/scene-events.ts"], ["playworld/original", "interactions/annotations.ts"]]
+      },
+      {
+        name: "playworld prop vocabulary",
+        area: "assets",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["buildPropGeometry", "buildCustomGeometry", "isBuiltinKind", "summarizeDefinition", "PROP_KINDS", "PROP_DESCRIPTIONS", "placementOf"],
+        summary: "twenty-three nordic and urban prop variants add vegetation, buildings, furniture, vehicles, and shoreline assets missing from the current preset catalog.",
+        boundary: "port reusable geometry definitions; put region-specific default world composition in a separate preset pack.",
+        sources: [["playworld/world", "props/catalog.ts"], ["playworld/world", "props/definition.ts"], ["playworld/world", "defaults.ts"]]
+      },
+      {
+        name: "surface-aware prop batching",
+        area: "assets",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["bakePart", "bakeOcclusion", "assemble", "createPropLayer", "signatureOf", "belongs", "scatter", "downhill"],
+        summary: "body, glow, and shiny surface splits plus baked contact occlusion and per-kind caches keep whole prop batches to a few draw calls.",
+        boundary: "extract geometry compilation and cache ownership; world-state reconciliation and shoreline policy stay consumer-side.",
+        sources: [["playworld/world", "props/catalog.ts"], ["playworld/world", "modules/props.ts"]]
+      },
+      {
+        name: "atmosphere layer",
+        area: "world",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["createAtmosphereLayer", "deriveAtmosphere", "emissiveStrength", "visibleGround"],
+        summary: "coupled sky gradient, linear fog, ibl, sun, hemisphere fill, bounce light, and view-fitted orthographic shadows solve a real reusable scene problem.",
+        boundary: "accept a palette and frame description; do not read host css inside the core module.",
+        sources: [["playworld/world", "modules/atmosphere.ts"], ["playworld/world", "palette.ts"]]
+      },
+      {
+        name: "endless ground, terrain, and water",
+        area: "world",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["createGroundLayer", "createTerrainSampler", "waterLevelFor", "createWaterSheet", "createInfiniteGround"],
+        summary: "recentered ground tiles, pure seeded height sampling, and an optional animated water sheet form a coherent open-world surface layer.",
+        boundary: "separate sampling from rendering and expose terrain style strategies instead of hard-coding playworld state.",
+        sources: [["playworld/world", "modules/ground.ts"], ["playworld/world", "modules/terrain.ts"], ["threejs-scenes", "geometry/infinite-ground.ts"]]
+      },
+      {
+        name: "voxel mesh authoring core",
+        area: "authoring",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["cloneLayer", "activeCells", "buildGeometry", "toNonIndexedClone", "makeGeometryFromArrays", "pushVertex", "pushTriangle"],
+        summary: "stacked two-dimensional layers compile into a single vertex-colored buffer geometry and provide a compact model-facing voxel sketch format.",
+        boundary: "package the layer data model and geometry compiler; leave grid dom, icons, and toolbar state in the editor.",
+        sources: [["meshes/prototype", "index.html"]]
+      },
+      {
+        name: "destructive mesh modifier pipeline",
+        area: "authoring",
+        decision: "adapt",
+        priority: "p1",
+        functions: ["createSubsurfaceGeometry", "createSmoothGeometry", "createWeldGeometry", "createQuantizedGeometry", "transformGeometry", "createBevelGeometry", "createEmbossGeometry", "createNoiseGeometry", "runModifier"],
+        summary: "subsurface, join, smooth, bevel, emboss, extrude, twist, taper, decimate, and crystal operations turn the prototype into a practical procedural mesh toolkit.",
+        boundary: "each modifier should be a pure geometry-in, geometry-out function with documented ownership and density limits.",
+        sources: [["meshes/prototype", "index.html"]]
+      },
+      {
+        name: "mesh edit history",
+        area: "authoring",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["disposeSnapshot", "clearHistory", "captureMeshState", "restoreMeshState", "pushUndoState", "replaceMeshGeometry", "EditStack"],
+        summary: "bounded undo and redo with explicit geometry disposal is reusable for destructive authoring workflows.",
+        boundary: "generalize snapshots over a caller-provided clone and dispose contract; keep button state outside.",
+        sources: [["meshes/prototype", "index.html"], ["threejs-scenes", "architecture/edit-stack.ts"]]
+      },
+      {
+        name: "voxel route and level generator",
+        area: "authoring",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createEmptyLevel", "generateRoute", "chooseRouteMove", "buildVoxelGeometry", "worldFromNode", "updatePathAnimation"],
+        summary: "a seeded route graph produces traversable voxel levels and a replayable path, useful as both generation API and test fixture.",
+        boundary: "extract serializable level data and deterministic builders; keep preview animation in the demo.",
+        sources: [["meshes/prototype", "level.html"]]
+      },
+      {
+        name: "voxel route feature builders",
+        area: "authoring",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["addStartPlaza", "addTunnelVoid", "carveArchedTunnelX", "carveArchedTunnelZ", "addFloatingChunks", "carveRouteArch", "carveFeatureClearance", "carveRouteTunnels", "addDecorativeTerrain", "addStairFeature", "addLadderFeature", "addBridgeFeature", "makeStairs", "makeLadder", "makeBridge"],
+        summary: "tunnels, arches, floating chunks, stairs, ladders, bridges, and decorative terrain are modular grammar operations over the level.",
+        boundary: "represent features as data first, then provide mesh builders as a second layer.",
+        sources: [["meshes/prototype", "level.html"]]
+      },
+      {
+        name: "serializable world state and normalization",
+        area: "world",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createWorld", "normalizeWorldState", "normalizeMood", "normalizeTerrain", "normalizeCamera", "normalizeCameraPath", "normalizeProp", "normalizeDefinition", "normalizeRemoveTarget", "countObjects"],
+        summary: "a forgiving state schema makes persisted or model-produced worlds deterministic and safe to project into scene modules.",
+        boundary: "consider a separate world-kit subpath; avoid making the small package core opinionated about one product schema.",
+        sources: [["playworld/world", "world.ts"], ["playworld/world", "normalize.ts"]]
+      },
+      {
+        name: "palette and mood derivation",
+        area: "world",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["readCssPalette", "deriveAtmosphere", "emissiveStrength"],
+        summary: "time of day, weather, fog, explicit colors, and a host palette resolve into a coherent lighting and environment recipe.",
+        boundary: "keep color derivation pure; offer css sampling only in a browser adapter.",
+        sources: [["playworld/world", "palette.ts"]]
+      },
+      {
+        name: "tilt-shift world post chain",
+        area: "post",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createPostChain"],
+        summary: "view-size-aware tilt shift, selective bloom, composer msaa restoration, and draw-only frame capping are proven behind-ui rendering patterns.",
+        boundary: "extract tilt-shift and frame-cap policies as options on postProcessing rather than a second composer abstraction.",
+        sources: [["playworld/world", "modules/post.ts"]]
+      },
+      {
+        name: "resource pools and procedural texture cache",
+        area: "core",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["MaterialPool", "createTextureCache", "createProceduralTexture", "proceduralTextureCache"],
+        summary: "keyed resource reuse prevents duplicate shaders and textures while retaining explicit ownership.",
+        boundary: "prefer app-scoped pools with reference counts; avoid module-global lifetime by default.",
+        sources: [["threejs-scenes", "architecture/material-pool.ts"], ["threejs-scenes", "architecture/procedural-texture.ts"]]
+      },
+      {
+        name: "view registry and scene module adapter",
+        area: "composition",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createViewRegistry", "createSceneModule"],
+        summary: "named views and context-injected modules help larger scenes switch coherent subtrees without leaking resources.",
+        boundary: "align with defineModule and app.use rather than preserving a parallel module contract.",
+        sources: [["threejs-scenes", "architecture/view-registry.ts"], ["threejs-scenes", "architecture/scene-module.ts"]]
+      },
+      {
+        name: "state sources and tweened values",
+        area: "animation",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["isStateController", "toController", "resolveInitialState", "bindStateSource", "EASINGS", "tweened", "lerpOnChange"],
+        summary: "external state adapters and frame-rate-independent value smoothing bridge application state into scene modules.",
+        boundary: "keep store integration generic and avoid hidden subscriptions that outlive module disposal.",
+        sources: [["threejs-scenes", "state/controller.ts"], ["threejs-scenes", "state/tween.ts"]]
+      },
+      {
+        name: "scene overlay and projection helpers",
+        area: "composition",
+        decision: "port",
+        priority: "p2",
+        functions: ["createOverlayScene", "renderOverlay", "projectToScreenUv"],
+        summary: "hud layers and world-to-screen projection support labels, selection, mini maps, and post-effect light positions.",
+        boundary: "preserve caller-owned render order and renderer state restoration.",
+        sources: [["threejs-scenes", "core/overlay.ts"], ["threejs-scenes", "core/projection.ts"]]
+      },
+      {
+        name: "worker update bridge",
+        area: "core",
+        decision: "port",
+        priority: "p2",
+        functions: ["createWorkerUpdateBridge"],
+        summary: "rate-limited worker updates move expensive simulation or generation off the render thread.",
+        boundary: "keep transport generic and make backpressure and teardown explicit.",
+        sources: [["threejs-scenes", "core/frame-loop-worker.ts"]]
+      },
+      {
+        name: "skybox composition",
+        area: "composition",
+        decision: "port",
+        priority: "p2",
+        functions: ["createSkybox", "executeSetSkydome", "executeSetSkybox"],
+        summary: "procedural gradients, cube textures, and skydome switching complement the current lighting module.",
+        boundary: "provide resource factories and disposal; model-facing commands belong in an adapter.",
+        sources: [["threejs-scenes", "compose/skybox.ts"], ["playworld/original", "skydome.ts"]]
+      },
+      {
+        name: "batched varied geometry",
+        area: "procedural",
+        decision: "port",
+        priority: "p2",
+        functions: ["createBatchedBuildings"],
+        summary: "BatchedMesh covers many different geometries sharing one material, the counterpart to InstancedMesh fields.",
+        boundary: "document update cost, maximum geometry counts, and WebGL renderer support.",
+        sources: [["threejs-scenes", "instancing/batched-buildings.ts"]]
+      },
+      {
+        name: "procedural body and segment stream",
+        area: "procedural",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createProceduralBody", "createSegmentStream"],
+        summary: "config-driven object bodies and recycled endless segments support vehicles, tracks, roads, and streamed scenery.",
+        boundary: "keep configuration serializable and seeded; do not bind the stream to one camera controller.",
+        sources: [["threejs-scenes", "procedural/body.ts"], ["threejs-scenes", "procedural/segment-stream.ts"]]
+      },
+      {
+        name: "lighting factories and presets",
+        area: "materials",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createLightCone", "applyEnvironment", "createSun", "createHemisphereFill", "setupStandardLighting", "LIGHTING_PRESETS", "createLightingRig"],
+        summary: "the current standardLighting module can expose lower-level light factories, named rigs, and a visible cone helper without duplicating ownership.",
+        boundary: "retain standardLighting as the primary module and export factories from a secondary surface.",
+        sources: [["threejs-scenes", "lighting/light-cone.ts"], ["threejs-scenes", "lighting/lighting.ts"], ["threejs-scenes", "lighting/presets.ts"]]
+      },
+      {
+        name: "shader quad and toon-map compatibility",
+        area: "materials",
+        decision: "port",
+        priority: "p2",
+        functions: ["createShaderQuad", "createGradientToonMap"],
+        summary: "a full-screen shader quad is useful outside EffectComposer; the toon-map helper can alias the current gradient ramp for migration.",
+        boundary: "avoid a second fullscreen-pass abstraction and share common glsl kernels.",
+        sources: [["threejs-scenes", "materials/shader-quad.ts"], ["threejs-scenes", "materials/presets.ts"]]
+      },
+      {
+        name: "remaining webgl effects",
+        area: "post",
+        decision: "port",
+        priority: "p2",
+        functions: ["createDifference", "createMaskPasses", "createSsgi", "createSss", "createTransition", "createDofPass", "createPostPipeline"],
+        summary: "difference blending, masking, ssgi, subsurface scattering, transitions, combined dof-chromatic aberration, and an explicit pipeline are the named v3 gaps.",
+        boundary: "verify each against three 0.184 and current shared glsl; keep expensive passes quality-gated.",
+        sources: [["threejs-scenes", "post/webgl/difference.ts"], ["threejs-scenes", "post/webgl/masking.ts"], ["threejs-scenes", "post/webgl/ssgi.ts"], ["threejs-scenes", "post/webgl/sss.ts"], ["threejs-scenes", "post/webgl/transition.ts"], ["threejs-scenes", "post/dof-chromatic-pass.ts"], ["threejs-scenes", "post/pipeline.ts"]]
+      },
+      {
+        name: "prop registry conveniences",
+        area: "assets",
+        decision: "adapt",
+        priority: "p3",
+        functions: ["registerProp", "getProp", "resolveProp"],
+        summary: "v3 exposes singleton-like registry helpers while the current package owns explicit registries.",
+        boundary: "prefer methods on createPropRegistry; add free helpers only if they do not hide global state.",
+        sources: [["threejs-scenes", "props/registry.ts"]]
+      },
+      {
+        name: "llm scene mutation facade",
+        area: "tools",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["createObjectRegistry", "executeSpawnObject", "executeUpdateObject", "executeRemoveObject", "executeScatter", "executeDuplicateObject", "executeSpawnInstancedProp", "executeSpawnPrimitive"],
+        summary: "playworld original demonstrates a complete command surface for model-driven scene edits and object identity.",
+        boundary: "package typed command executors over caller-owned registries; provider schemas and product tool names stay outside.",
+        sources: [["playworld/original", "object-registry.ts"], ["playworld/original", "scene-objects.ts"], ["playworld/original", "props.ts"], ["playworld/original-app", "llm/browser-tools.ts"]]
+      },
+      {
+        name: "model-facing world tool schema",
+        area: "tools",
+        decision: "adapt",
+        priority: "p2",
+        functions: ["WORLD_TOOL_NAMES", "WORLD_TOOLS", "setWorldHandler", "executeWorldTool", "parseArgs"],
+        summary: "eight schema-defined commands cover world description, mood, terrain, props, custom prop definitions, camera moves, and camera paths without importing three.js into the model layer.",
+        boundary: "keep provider-neutral names, json schema, and honest error handling; inject the live-world handler from the host.",
+        sources: [["playworld/chat", "ai/tools/world.ts"]]
+      },
+      {
+        name: "lazy world stage and fallback bridge",
+        area: "world",
+        decision: "keep-app",
+        priority: "p2",
+        functions: ["hasWebGL", "createWorldStage"],
+        summary: "the chat lazily imports the renderer, persists the latest state, reports health, rebuilds after context restoration, and reveals a css fallback whenever webgl is unavailable.",
+        boundary: "keep the dom stage and gradient fallback in playworld; feed lifecycle lessons back into the package-level attachLifecycle candidate.",
+        sources: [["playworld/chat", "views/world.ts"]]
+      },
+      {
+        name: "camera command facade",
+        area: "tools",
+        decision: "adapt",
+        priority: "p3",
+        functions: ["createCameraController", "executeSetCamera", "executeFrameObject", "executeGetViewport"],
+        summary: "set-camera, frame-object, and viewport inspection translate model commands into a stable camera controller.",
+        boundary: "build on the package camera rigs and expose neutral commands, not browser-tool response types.",
+        sources: [["playworld/original", "camera.ts"]]
+      },
+      {
+        name: "environment, light, and material controllers",
+        area: "tools",
+        decision: "adapt",
+        priority: "p3",
+        functions: ["createEnvironmentController", "createLightingController", "executeUpdateMaterial", "createShaderClock"],
+        summary: "runtime environment changes, named light mutation, material editing, and animated shader time form an inspectable scene-control layer.",
+        boundary: "require explicit registries and disposal; never traverse and mutate arbitrary scene resources without ownership metadata.",
+        sources: [["playworld/original", "environment.ts"], ["playworld/original", "lighting.ts"], ["playworld/original", "materials.ts"], ["playworld/original", "clock.ts"]]
+      },
+      {
+        name: "monument and terrain-map tools",
+        area: "tools",
+        decision: "adapt",
+        priority: "p3",
+        functions: ["executeSpawnMonument", "executeApplyTerrainMap", "textureFromImage", "createFallbackTexture"],
+        summary: "styled memorial geometry and image-driven terrain are useful reference factories for richer model-authored scenes.",
+        boundary: "split pure geometry or texture conversion from command execution and browser image loading.",
+        sources: [["playworld/original", "monument.ts"], ["playworld/original", "terrain/generate-terrain.ts"]]
+      },
+      {
+        name: "world manager",
+        area: "world",
+        decision: "keep-app",
+        priority: "p3",
+        functions: ["createWorldManager"],
+        summary: "multi-world activation and persistence orchestration is valuable product behavior but not a three.js scene primitive.",
+        boundary: "keep in playworld; use the package only for disposable world instances and serializable specs.",
+        sources: [["playworld/original", "world-manager.ts"], ["playworld/original-app", "world-switcher.ts"]]
+      },
+      {
+        name: "mesh preview ui and render modes",
+        area: "authoring",
+        decision: "keep-app",
+        priority: "p3",
+        functions: ["applyRenderMode", "applyCamera", "releasePointer", "paintCell", "syncGridDom", "syncLayerControls", "hydrateIcons"],
+        summary: "touch orbit, grid painting, toolbar state, and wire, solid, or glass previews make a strong standalone editor.",
+        boundary: "keep dom and interaction code in meshes; extract only proven geometry or material factories.",
+        sources: [["meshes/prototype", "index.html"]]
+      },
+      {
+        name: "wasteland scene recipes",
+        area: "world",
+        decision: "included",
+        priority: "done",
+        functions: ["atmosphereModule", "terrainModule", "kitModule", "campModule", "dustModule", "placeCamera", "zoomTo"],
+        summary: "the named wasteland geometries are already ported; these modules remain useful examples of batching, composite animation, particles, and an rts iso camera.",
+        boundary: "keep as starters or recipes unless two unrelated consumers need the same behavior.",
+        sources: [["meshes/wasteland", "main.ts"], ["threejs-scene", "modules/assets/kit.ts"]]
+      },
+      {
+        name: "geometry, materials, textures, and prop ownership",
+        area: "assets",
+        decision: "included",
+        priority: "done",
+        functions: ["Prop", "markShared", "createStandardMaterial", "createToonMaterial", "createMatcapMaterial", "createHolographicMaterial", "createTriplanarMaterial", "createGridTexture", "createNoiseTexture", "createGradientTexture", "createSeamlessNoiseTexture", "createMatcapTexture", "createExtrudedMesh", "createLatheMesh", "createPathTube", "applyTwist", "applyTaper", "applyBend", "displaceByNoise", "simplifyGeometry", "edgeSplit", "mergeVertices", "createConnectionGraph", "createInfiniteGround"],
+        summary: "the current assets module already contains the large v3 geometry and material surface plus stronger ownership, manifests, presets, authoring, placement, and physics-ready props.",
+        boundary: "treat these as baseline and avoid importing duplicate v3 implementations.",
+        sources: [["threejs-scene", "modules/assets/index.ts"], ["threejs-scenes", "geometry/index.ts"]]
+      },
+      {
+        name: "current webgl post catalog",
+        area: "post",
+        decision: "included",
+        priority: "done",
+        functions: ["createComposer", "createBloom", "createSelectiveBloom", "createEmissiveBloom", "createGodRaysPass", "createGradePass", "createDof", "createMotionBlur", "createChromaticAberration", "createFilmGrainPass", "createCrtPass", "createRetroPass", "createOutline", "createSobel", "createSsr", "createAo", "createFXAA", "createSMAA", "createSsaa", "createTraa", "createLUT", "createLensflare", "createLensingPass", "createRadialBlur", "createPixel", "createAfterimage", "createAnamorphic", "createStereoRenderer"],
+        summary: "most v3 webgl effects already exist in the current package and share common glsl kernels.",
+        boundary: "only the explicitly listed remaining-webgl row needs review.",
+        sources: [["threejs-scene", "modules/post/webgl/index.ts"], ["threejs-scenes", "post/webgl/index.ts"]]
+      },
+      {
+        name: "reactive jsx scene layer",
+        area: "experimental",
+        decision: "experimental",
+        priority: "later",
+        functions: ["createHost", "mountTree", "render", "signal", "derived", "jsx", "jsxs", "h", "useScene", "useRenderer", "useCamera", "useLoop", "useRng", "useSize", "useAspect", "useFrame", "useDispose", "useFrameLoop", "useSignal", "useDerived"],
+        summary: "a small non-react jsx reconciler and signals layer offers declarative scene composition without r3f.",
+        boundary: "keep isolated behind jsx and jsx-runtime subpaths; decide only if declarative authoring is a package goal.",
+        sources: [["threejs-scenes", "jsx/index.ts"]]
+      },
+      {
+        name: "webgpu and tsl post pipeline",
+        area: "experimental",
+        decision: "experimental",
+        priority: "later",
+        functions: ["createRenderPipeline", "createScenePass", "createScenePassMRT", "createScenePassVelocity", "createScenePassEmissive", "createScenePassSSR", "createPostProcessing", "createAfterImage", "createBloomEmissive", "createBloomSelective", "createDofBasic", "createPixelationPass", "createMasking"],
+        summary: "the old package contains a broad tsl node-effect mirror, but the current package and active skill explicitly target webgl.",
+        boundary: "if adopted, publish a completely separate entry point so importing the main package never resolves three/webgpu or three/tsl.",
+        sources: [["threejs-scenes", "post/webgpu/index.ts"], ["threejs-scenes", "post/webgpu/pipeline.ts"]]
+      }
+    ]
+
+    const rawInventory = [{"src":"threejs-scenes","file":"animation/clips.ts","symbols":[["numberTrack","fn",1,0],["vectorTrack","fn",1,0],["quaternionTrack","fn",1,0],["trackFromKeyframes","fn",1,0],["clipFromTracks","fn",1,0],["spinClip","fn",1,0],["bobClip","fn",1,0],["pulseScaleClip","fn",1,0],["combineClips","fn",1,0]]},{"src":"threejs-scenes","file":"animation/mixer.ts","symbols":[["createAnimationController","fn",1,0]]},{"src":"threejs-scenes","file":"architecture/edit-stack.ts","symbols":[["EditStack","class",1,0]]},{"src":"threejs-scenes","file":"architecture/material-pool.ts","symbols":[["MaterialPool","class",1,0]]},{"src":"threejs-scenes","file":"architecture/param-coercion.ts","symbols":[["resolveParam","fn",1,1],["resolveParams","fn",1,1]]},{"src":"threejs-scenes","file":"architecture/pick.ts","symbols":[["pickTopLevel","fn",1,0],["pick","fn",1,0],["createClickGuard","fn",1,0]]},{"src":"threejs-scenes","file":"architecture/procedural-texture.ts","symbols":[["createTextureCache","fn",1,0],["createProceduralTexture","fn",1,0],["proceduralTextureCache","const",1,0]]},{"src":"threejs-scenes","file":"architecture/scene-module.ts","symbols":[["createSceneModule","fn",1,0]]},{"src":"threejs-scenes","file":"architecture/view-registry.ts","symbols":[["createViewRegistry","fn",1,0]]},{"src":"threejs-scenes","file":"camera/camera-controller.ts","symbols":[["createCameraController","fn",1,0]]},{"src":"threejs-scenes","file":"camera/follow-camera.ts","symbols":[["createFollowCamera","fn",1,1]]},{"src":"threejs-scenes","file":"camera/iso-camera.ts","symbols":[["createIsoCamera","fn",1,1],["resizeIsoCamera","fn",1,1]]},{"src":"threejs-scenes","file":"camera/path-camera.ts","symbols":[["createPathCamera","fn",1,0]]},{"src":"threejs-scenes","file":"camera/targets.ts","symbols":[["tupleToVector3","fn",1,0],["vector3ToTuple","fn",1,0],["targetFromObject","fn",1,0]]},{"src":"threejs-scenes","file":"compose/scene-events.ts","symbols":[["bindSceneEvents","fn",1,0]]},{"src":"threejs-scenes","file":"compose/skybox.ts","symbols":[["createSkybox","fn",1,0]]},{"src":"threejs-scenes","file":"core/app.ts","symbols":[["createApp","fn",1,1]]},{"src":"threejs-scenes","file":"core/clock.ts","symbols":[["createClock","fn",1,1]]},{"src":"threejs-scenes","file":"core/dispose.ts","symbols":[["disposeMaterial","fn",1,1],["disposeScene","fn",1,1]]},{"src":"threejs-scenes","file":"core/frame-loop-worker.ts","symbols":[["createWorkerUpdateBridge","fn",1,0]]},{"src":"threejs-scenes","file":"core/frame-loop.ts","symbols":[["createFrameLoop","fn",1,1]]},{"src":"threejs-scenes","file":"core/overlay.ts","symbols":[["createOverlayScene","fn",1,0],["renderOverlay","fn",1,0]]},{"src":"threejs-scenes","file":"core/pointer-gesture.ts","symbols":[["attachPointerGesture","fn",1,1]]},{"src":"threejs-scenes","file":"core/projection.ts","symbols":[["projectToScreenUv","fn",1,0]]},{"src":"threejs-scenes","file":"core/quality.ts","symbols":[["QUALITY_PRESETS","const",1,0],["detectTier","fn",1,0],["getQualitySettings","fn",1,0]]},{"src":"threejs-scenes","file":"core/renderer.ts","symbols":[["createRenderer","fn",1,1],["attachResizeObserver","fn",1,1]]},{"src":"threejs-scenes","file":"core/scene-bootstrap.ts","symbols":[["bootstrapScene","fn",1,0]]},{"src":"threejs-scenes","file":"core/state.ts","symbols":[["createStore","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/connection-graph.ts","symbols":[["createConnectionGraph","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/extrude.ts","symbols":[["createExtrudedMesh","fn",1,1],["extrudeAlongPath","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/group.ts","symbols":[["createGroup","fn",1,1],["layoutGrid","fn",1,1],["layoutRadial","fn",1,1],["layoutStack","fn",1,1],["groupBounds","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/infinite-ground.ts","symbols":[["createInfiniteGround","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/lathe.ts","symbols":[["createLatheMesh","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/merge.ts","symbols":[["mergeMeshes","fn",1,1],["mergeGeometryList","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/modifiers.ts","symbols":[["applyTwist","fn",1,1],["applyTaper","fn",1,1],["applyBend","fn",1,1],["displaceByNoise","fn",1,1],["simplifyGeometry","fn",1,1],["tessellateGeometry","fn",1,1],["edgeSplit","fn",1,1],["mergeVertices","fn",1,1],["recomputeNormals","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/path-tube.ts","symbols":[["parallelTransportFrames","fn",1,1],["createPathTube","fn",1,1]]},{"src":"threejs-scenes","file":"geometry/shapes.ts","symbols":[["roundedRectShape","fn",1,1],["polygonShape","fn",1,1],["starShape","fn",1,1],["gearShape","fn",1,1],["ringShape","fn",1,1]]},{"src":"threejs-scenes","file":"instancing/batched-buildings.ts","symbols":[["createBatchedBuildings","fn",1,0]]},{"src":"threejs-scenes","file":"instancing/instanced-field.ts","symbols":[["createInstancedField","fn",1,0]]},{"src":"threejs-scenes","file":"jsx/components.ts","symbols":[["createHost","fn",1,0],["RAW_FUNCTION_PROPS","const",1,0]]},{"src":"threejs-scenes","file":"jsx/hooks.ts","symbols":[["setCurrentRuntime","fn",1,0],["useRuntime","fn",1,0],["useScene","fn",1,0],["useRenderer","fn",1,0],["useCamera","fn",1,0],["useLoop","fn",1,0],["useRng","fn",1,0],["useSize","fn",1,0],["useAspect","fn",1,0],["useFrame","fn",1,0],["useDispose","fn",1,0],["useFrameLoop","fn",1,0],["useSignal","const",1,0],["useDerived","const",1,0]]},{"src":"threejs-scenes","file":"jsx/jsx-runtime.ts","symbols":[["Fragment","const",1,0],["jsx","fn",1,0],["jsxs","const",1,0],["jsxDEV","const",1,0],["h","fn",1,0]]},{"src":"threejs-scenes","file":"jsx/reconciler.ts","symbols":[["mountTree","fn",1,0]]},{"src":"threejs-scenes","file":"jsx/render.ts","symbols":[["render","fn",1,0]]},{"src":"threejs-scenes","file":"jsx/signal.ts","symbols":[["signal","fn",1,0],["derived","fn",1,0],["isAccessor","fn",1,0]]},{"src":"threejs-scenes","file":"lighting/light-cone.ts","symbols":[["createLightCone","fn",1,0]]},{"src":"threejs-scenes","file":"lighting/lighting.ts","symbols":[["applyEnvironment","fn",1,0],["createSun","fn",1,0],["createHemisphereFill","fn",1,0],["setupStandardLighting","fn",1,0]]},{"src":"threejs-scenes","file":"lighting/presets.ts","symbols":[["LIGHTING_PRESETS","const",1,0],["createLightingRig","fn",1,0]]},{"src":"threejs-scenes","file":"loaders/gltf.ts","symbols":[["createGLTFLoader","fn",1,0],["loadGLTF","fn",1,0]]},{"src":"threejs-scenes","file":"loaders/model-registry.ts","symbols":[["FORMAT_LOADERS","const",1,0],["createModelCache","fn",1,0],["loadModel","fn",1,0],["clearModelCache","fn",1,0]]},{"src":"threejs-scenes","file":"materials/holographic-material.ts","symbols":[["createHolographicMaterial","fn",1,1]]},{"src":"threejs-scenes","file":"materials/presets.ts","symbols":[["MATERIAL_PRESETS","const",1,1],["createStandardMaterial","fn",1,1],["createGradientToonMap","fn",1,0],["createToonMaterial","fn",1,1],["createMatcapMaterial","fn",1,1]]},{"src":"threejs-scenes","file":"materials/shader-quad.ts","symbols":[["createShaderQuad","fn",1,0]]},{"src":"threejs-scenes","file":"materials/triplanar.ts","symbols":[["createTriplanarMaterial","fn",1,1]]},{"src":"threejs-scenes","file":"particles/cpu-particles.ts","symbols":[["createParticleEmitter","fn",1,0]]},{"src":"threejs-scenes","file":"particles/curves.ts","symbols":[["sampleCurve","fn",1,0],["bakeCurve","fn",1,0],["bakeCurveTexture","fn",1,0]]},{"src":"threejs-scenes","file":"particles/emitter.ts","symbols":[["sampleShape","fn",1,0],["createEmitter","fn",1,0]]},{"src":"threejs-scenes","file":"particles/gpu-emitter.ts","symbols":[["createGpuEmitter","fn",1,0]]},{"src":"threejs-scenes","file":"post/cinematic-lut.ts","symbols":[["createCinematicLUT","fn",1,1]]},{"src":"threejs-scenes","file":"post/composer.ts","symbols":[["createComposer","fn",1,1]]},{"src":"threejs-scenes","file":"post/dof-chromatic-pass.ts","symbols":[["createDofPass","fn",1,0]]},{"src":"threejs-scenes","file":"post/film-grain-pass.ts","symbols":[["createFilmGrainPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/glitch-passes.ts","symbols":[["createRgbShiftPass","fn",1,1],["createBlockDisplacementPass","fn",1,1],["createScanCorruptionPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/god-rays-pass.ts","symbols":[["createGodRaysPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/grade-pass.ts","symbols":[["GradeShader","const",1,1],["createGradePass","fn",1,1]]},{"src":"threejs-scenes","file":"post/hud-beam-transition.ts","symbols":[["createHudBeamTransition","fn",1,1]]},{"src":"threejs-scenes","file":"post/pipeline.ts","symbols":[["createPostPipeline","fn",1,0]]},{"src":"threejs-scenes","file":"post/stereoscopy.ts","symbols":[["createStereoRenderer","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/afterimage.ts","symbols":[["createAfterimage","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/anamorphic.ts","symbols":[["createAnamorphic","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/ao.ts","symbols":[["createAo","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/bloom-emissive.ts","symbols":[["createEmissiveBloom","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/bloom-selective.ts","symbols":[["BLOOM_LAYER","const",1,1],["createSelectiveBloom","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/bloom.ts","symbols":[["createBloom","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/burn-in.ts","symbols":[["BurnInPass","class",1,1],["createBurnInPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/ca.ts","symbols":[["createChromaticAberration","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/crt.ts","symbols":[["createCrtPass","fn",1,1],["crtCorrectPointer","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/difference.ts","symbols":[["createDifference","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgl/dof.ts","symbols":[["createDof","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/fxaa.ts","symbols":[["createFXAA","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/lensflare.ts","symbols":[["createLensflare","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/lensing.ts","symbols":[["createLensingPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/lut.ts","symbols":[["createLUT","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/masking.ts","symbols":[["createMaskPasses","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgl/motion-blur.ts","symbols":[["createMotionBlur","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/outline.ts","symbols":[["createOutline","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/pixel.ts","symbols":[["createPixel","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/radial-blur.ts","symbols":[["createRadialBlur","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/retro.ts","symbols":[["createRetroPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/smaa.ts","symbols":[["createSMAA","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/sobel.ts","symbols":[["createSobel","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/ssaa.ts","symbols":[["createSsaa","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/ssgi.ts","symbols":[["createSsgi","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgl/ssr.ts","symbols":[["createSsr","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/sss.ts","symbols":[["createSss","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgl/traa.ts","symbols":[["createTraa","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgl/transition.ts","symbols":[["createTransition","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/afterimage.ts","symbols":[["createAfterImage","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/anamorphic.ts","symbols":[["createAnamorphic","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/ao.ts","symbols":[["createAo","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/bloom-emissive.ts","symbols":[["createBloomEmissive","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/bloom-selective.ts","symbols":[["createBloomSelective","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/bloom.ts","symbols":[["createBloom","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/ca.ts","symbols":[["createChromaticAberration","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/difference.ts","symbols":[["createDifference","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/dof.ts","symbols":[["createDof","fn",1,1],["createDofBasic","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/fxaa.ts","symbols":[["createFxaa","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/godrays.ts","symbols":[["createGodrays","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/lensflare.ts","symbols":[["createLensflare","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/lut.ts","symbols":[["createLut","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/masking.ts","symbols":[["createMasking","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/motion-blur.ts","symbols":[["createMotionBlur","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/outline.ts","symbols":[["createOutline","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/pipeline.ts","symbols":[["createScenePass","fn",1,0],["createScenePassMRT","fn",1,0],["createScenePassVelocity","fn",1,0],["createScenePassEmissive","fn",1,0],["createScenePassSSR","fn",1,0],["createRenderPipeline","fn",1,0],["createPostProcessing","const",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/pixel.ts","symbols":[["createPixelationPass","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/radial-blur.ts","symbols":[["createRadialBlur","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/retro.ts","symbols":[["createRetroPass","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/smaa.ts","symbols":[["createSmaa","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/sobel.ts","symbols":[["createSobel","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/ssaa.ts","symbols":[["createSsaaPass","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/ssgi.ts","symbols":[["createSsgi","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/ssr.ts","symbols":[["createSsr","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/sss.ts","symbols":[["createSss","fn",1,0]]},{"src":"threejs-scenes","file":"post/webgpu/traa.ts","symbols":[["createTraa","fn",1,1]]},{"src":"threejs-scenes","file":"post/webgpu/transition.ts","symbols":[["createTransition","fn",1,0]]},{"src":"threejs-scenes","file":"procedural/body.ts","symbols":[["createProceduralBody","fn",1,0]]},{"src":"threejs-scenes","file":"procedural/noise-texture.ts","symbols":[["createNoiseTexture","fn",1,1]]},{"src":"threejs-scenes","file":"procedural/noise.ts","symbols":[["createNoise3D","fn",1,0]]},{"src":"threejs-scenes","file":"procedural/poisson-disk.ts","symbols":[["poissonDisk","fn",1,0]]},{"src":"threejs-scenes","file":"procedural/rng.ts","symbols":[["mulberry32","fn",1,1],["hash2","fn",1,1],["hash3","fn",1,1],["lerp","fn",1,1],["smoothstep","fn",1,1],["createSeededRng","fn",1,1]]},{"src":"threejs-scenes","file":"procedural/segment-stream.ts","symbols":[["createSegmentStream","fn",1,0]]},{"src":"threejs-scenes","file":"props/composite.ts","symbols":[["createPropComposite","fn",1,1]]},{"src":"threejs-scenes","file":"props/instanced-prop.ts","symbols":[["createInstancedProp","fn",1,1]]},{"src":"threejs-scenes","file":"props/prop.ts","symbols":[["defineProp","fn",1,1],["createProp","fn",1,1]]},{"src":"threejs-scenes","file":"props/registry.ts","symbols":[["createPropRegistry","fn",1,1],["registerProp","fn",1,0],["getProp","fn",1,0],["resolveProp","fn",1,0]]},{"src":"threejs-scenes","file":"scaffold/fps.ts","symbols":[["createFpsScaffold","fn",1,0]]},{"src":"threejs-scenes","file":"scaffold/iso.ts","symbols":[["createIsoScaffold","fn",1,0]]},{"src":"threejs-scenes","file":"scaffold/orbit.ts","symbols":[["createOrbitScaffold","fn",1,0]]},{"src":"threejs-scenes","file":"scaffold/rails.ts","symbols":[["createRailsScaffold","fn",1,0]]},{"src":"threejs-scenes","file":"scaffold/tpp.ts","symbols":[["createTppScaffold","fn",1,0]]},{"src":"threejs-scenes","file":"state/controller.ts","symbols":[["isStateController","fn",1,0],["toController","fn",1,0],["resolveInitialState","fn",1,0],["bindStateSource","fn",1,0]]},{"src":"threejs-scenes","file":"state/tween.ts","symbols":[["EASINGS","const",1,0],["tweened","fn",1,0],["lerpOnChange","fn",1,0]]},{"src":"threejs-scenes","file":"voxels/chunk-manager.ts","symbols":[["createChunkManager","fn",1,0]]},{"src":"threejs-scenes","file":"voxels/greedy-mesh.ts","symbols":[["greedyMesh","fn",1,0]]},{"src":"threejs-scenes","file":"voxels/voxel-data.ts","symbols":[["VoxelChunk","class",1,0]]},{"src":"playworld/world","file":"defaults.ts","symbols":[["TIMES_OF_DAY","const",1,0],["WEATHERS","const",1,0],["TERRAIN_STYLES","const",1,0],["EASINGS","const",1,0],["PATH_MODES","const",1,0],["PART_SHAPES","const",1,0],["SURFACES","const",1,0],["PROP_KINDS","const",1,0],["PROP_PLACEMENT","const",1,0],["PLACEMENTS","const",1,0],["PLACEMENT_HINT","const",1,0],["placementOf","fn",1,0],["PROP_DESCRIPTIONS","const",1,0],["DEFAULT_WORLD","const",1,0],["MOTION","const",1,0],["LIMITS","const",1,0]]},{"src":"playworld/world","file":"modules/atmosphere.ts","symbols":[["visibleGround","fn",0,0],["isDirectionalLight","fn",0,0],["isHemisphereLight","fn",0,0],["mountLighting","fn",0,0],["createAtmosphereLayer","fn",1,0]]},{"src":"playworld/world","file":"modules/camera-path.ts","symbols":[["EASINGS","const",1,0],["lerpAngle","fn",1,0],["lerp","fn",0,1],["createPathRunner","fn",1,0]]},{"src":"playworld/world","file":"modules/camera.ts","symbols":[["createCameraRig","fn",1,0]]},{"src":"playworld/world","file":"modules/ground.ts","symbols":[["createGroundLayer","fn",1,0]]},{"src":"playworld/world","file":"modules/lifecycle.ts","symbols":[["attachLifecycle","fn",1,0]]},{"src":"playworld/world","file":"modules/post.ts","symbols":[["createPostChain","fn",1,0]]},{"src":"playworld/world","file":"modules/props.ts","symbols":[["signatureOf","fn",0,0],["belongs","fn",0,0],["scatter","fn",0,0],["downhill","fn",0,0],["createPropLayer","fn",1,0]]},{"src":"playworld/world","file":"modules/scaffold.ts","symbols":[["createIsoScaffold","fn",1,0]]},{"src":"playworld/world","file":"modules/terrain.ts","symbols":[["createTerrainSampler","fn",1,0],["waterLevelFor","fn",1,0],["createWaterSheet","fn",1,0]]},{"src":"playworld/world","file":"normalize.ts","symbols":[["fields","fn",0,0],["clamp","fn",1,0],["num","fn",0,0],["oneOf","fn",0,0],["vec2","fn",0,0],["colors","fn",0,0],["normalizeMood","fn",1,0],["normalizeTerrain","fn",1,0],["normalizeCamera","fn",1,0],["normalizeMove","fn",1,0],["normalizeWaypoint","fn",0,0],["normalizeCameraPath","fn",1,0],["propId","fn",0,0],["kindName","fn",0,0],["vec3","fn",0,0],["pick","fn",0,0],["normalizePart","fn",0,0],["normalizeDefinition","fn",1,0],["normalizeProp","fn",1,0],["normalizeWorldState","fn",1,0],["normalizeRemoveTarget","fn",1,0],["countObjects","fn",1,0]]},{"src":"playworld/world","file":"palette.ts","symbols":[["readCssPalette","fn",1,0],["toColor","fn",0,0],["blendPalette","fn",0,0],["deriveAtmosphere","fn",1,0],["emissiveStrength","fn",1,0]]},{"src":"playworld/world","file":"procedural/instances.ts","symbols":[["createInstancedField","fn",1,0]]},{"src":"playworld/world","file":"procedural/noise.ts","symbols":[["createNoise3D","fn",1,0]]},{"src":"playworld/world","file":"procedural/scatter.ts","symbols":[["poissonDisk","fn",1,0]]},{"src":"playworld/world","file":"props/catalog.ts","symbols":[["bakePart","fn",0,0],["merge","fn",0,0],["bakeOcclusion","fn",0,0],["heightOf","fn",0,0],["assemble","fn",0,0],["isBuiltinKind","fn",1,0],["buildPropGeometry","fn",1,0],["primitiveFor","fn",0,0],["buildCustomGeometry","fn",1,0]]},{"src":"playworld/world","file":"props/definition.ts","symbols":[["summarizeDefinition","fn",1,0]]},{"src":"playworld/world","file":"quality.ts","symbols":[["matches","fn",0,0],["detectQuality","fn",1,0]]},{"src":"playworld/world","file":"world.ts","symbols":[["createWorld","fn",1,0]]},{"src":"playworld/original","file":"camera.ts","symbols":[["createCameraController","fn",1,0],["executeSetCamera","fn",1,0],["executeFrameObject","fn",1,0],["executeGetViewport","fn",1,0]]},{"src":"playworld/original","file":"clock.ts","symbols":[["isAnimatedShader","fn",0,0],["createShaderClock","fn",1,0]]},{"src":"playworld/original","file":"dispose.ts","symbols":[["disposeMaterial","fn",0,1],["disposeHierarchy","fn",1,0]]},{"src":"playworld/original","file":"environment.ts","symbols":[["createEnvironmentController","fn",1,0]]},{"src":"playworld/original","file":"interactions/annotations.ts","symbols":[["attachAnnotationSystem","fn",1,0]]},{"src":"playworld/original","file":"lighting.ts","symbols":[["nextLightId","fn",0,0],["createLightingController","fn",1,0]]},{"src":"playworld/original","file":"materials.ts","symbols":[["executeUpdateMaterial","fn",1,0]]},{"src":"playworld/original","file":"monument.ts","symbols":[["createGeometry","fn",0,0],["createMaterial","fn",0,0],["executeSpawnMonument","fn",1,0]]},{"src":"playworld/original","file":"object-registry.ts","symbols":[["createObjectRegistry","fn",1,0]]},{"src":"playworld/original","file":"props.ts","symbols":[["sampleGroundY","fn",0,0],["createGeometryForPrompt","fn",0,0],["createMaterialForPrompt","fn",0,0],["executeSpawnInstancedProp","fn",1,0],["createPrimitiveGeometry","fn",0,0],["executeSpawnPrimitive","fn",1,0]]},{"src":"playworld/original","file":"scene-objects.ts","symbols":[["nextId","fn",0,0],["hexColor","fn",0,0],["parseVec3","fn",0,0],["parseScale","fn",0,0],["createPrimitiveGeometry","fn",0,0],["createKindGeometry","fn",0,0],["executeSpawnObject","fn",1,0],["createLight","fn",0,0],["executeUpdateObject","fn",1,0],["executeRemoveObject","fn",1,0],["executeScatter","fn",1,0],["executeDuplicateObject","fn",1,0]]},{"src":"playworld/original","file":"skydome.ts","symbols":[["executeSetSkydome","fn",1,0],["executeSetSkybox","fn",1,0]]},{"src":"playworld/original","file":"terrain/generate-terrain.ts","symbols":[["seededNoise","fn",0,0],["textureFromImage","fn",0,0],["createFallbackTexture","fn",0,0],["executeApplyTerrainMap","fn",1,0]]},{"src":"playworld/original","file":"world-manager.ts","symbols":[["createWorldManager","fn",1,0]]},{"src":"meshes/wasteland","file":"main.ts","symbols":[["clamp01","fn",0,0],["rr","fn",0,0],["n01","fn",0,0],["heightAt","fn",0,0],["makePart","fn",0,0],["grime","fn",0,0],["buildKit","fn",0,0],["box","fn",0,0],["cyl","fn",0,0],["cone","fn",0,0],["tetra","fn",0,0],["ruinedBlock","fn",0,0],["watchtower","fn",0,0],["pylon","fn",0,0],["wreckCar","fn",0,0],["deadTree","fn",0,0],["barrelCluster","fn",0,0],["rubblePile","fn",0,0],["barricade","fn",0,0],["tireStack","fn",0,0],["roadSign","fn",0,0],["atmosphereModule","fn",0,0],["terrainModule","fn",0,0],["kitModule","fn",0,0],["campModule","fn",0,0],["dustModule","fn",0,0],["placeCamera","fn",0,0],["zoomTo","fn",0,0]]},{"src":"meshes/prototype","file":"index.html","symbols":[["mulberry32","fn",0,1],["cloneLayer","fn",0,0],["anyLayerFilled","fn",0,0],["activeCells","fn",0,0],["countActiveCells","fn",0,0],["getTriangleCount","fn",0,0],["setLayerStatus","fn",0,0],["setMeshStatus","fn",0,0],["hydrateIcons","fn",0,0],["syncCellDom","fn",0,0],["syncGridDom","fn",0,0],["syncLayerControls","fn",0,0],["paintCell","fn",0,0],["stopPainting","fn",0,0],["buildGeometry","fn",0,0],["toNonIndexedClone","fn",0,0],["makeGeometryFromArrays","fn",0,0],["readColor","fn",0,0],["midpoint","fn",0,0],["pushVertex","fn",0,0],["pushTriangle","fn",0,0],["quantizedKey","fn",0,0],["createSubsurfaceGeometry","fn",0,0],["createSmoothGeometry","fn",0,0],["createWeldGeometry","fn",0,0],["createQuantizedGeometry","fn",0,0],["transformGeometry","fn",0,0],["createBevelGeometry","fn",0,0],["createEmbossGeometry","fn",0,0],["createNoiseGeometry","fn",0,0],["disposeSnapshot","fn",0,0],["clearHistory","fn",0,0],["captureMeshState","fn",0,0],["restoreMeshState","fn",0,0],["pushUndoState","fn",0,0],["replaceMeshGeometry","fn",0,0],["runModifier","fn",0,0],["syncToolbarButtons","fn",0,0],["applyRenderMode","fn",0,0],["regenerate","fn",0,0],["applyCamera","fn",0,0],["releasePointer","fn",0,0],["frame","fn",0,0]]},{"src":"meshes/prototype","file":"level.html","symbols":[["mulberry32","fn",0,1],["makeNoise2D","fn",0,0],["cellIndex","fn",0,0],["voxelKey","fn",0,0],["cellKey","fn",0,0],["gridToWorld","fn",0,0],["createEmptyLevel","fn",0,0],["pushLinePoint","fn",0,0],["addPathCell","fn",0,0],["addStartPlaza","fn",0,0],["addTunnelVoid","fn",0,0],["isSolidVoxel","fn",0,0],["distanceToPath","fn",0,0],["shuffledDirections","fn",0,0],["chooseRouteMove","fn",0,0],["carveArchedTunnelX","fn",0,0],["carveArchedTunnelZ","fn",0,0],["addFloatingChunks","fn",0,0],["carveRouteArch","fn",0,0],["carveFeatureClearance","fn",0,0],["carveRouteTunnels","fn",0,0],["addDecorativeTerrain","fn",0,0],["addStairFeature","fn",0,0],["addLadderFeature","fn",0,0],["addBridgeFeature","fn",0,0],["generateRoute","fn",0,0],["buildVoxelGeometry","fn",0,0],["createBoxMesh","fn",0,0],["worldFromNode","fn",0,0],["makeStairs","fn",0,0],["makeLadder","fn",0,0],["makeBridge","fn",0,0],["disposeGroup","fn",0,0],["regenerate","fn",0,0],["applyCamera","fn",0,0],["releasePointer","fn",0,0],["updatePathAnimation","fn",0,0],["frame","fn",0,0]]}]
+
+    rawInventory.push(
+      {
+        src: "playworld/chat",
+        file: "ai/tools/world.ts",
+        symbols: [
+          ["WORLD_TOOL_NAMES", "const", 1, 0],
+          ["WORLD_TOOLS", "const", 1, 0],
+          ["setWorldHandler", "fn", 1, 0],
+          ["parseArgs", "fn", 0, 0],
+          ["executeWorldTool", "fn", 1, 0]
+        ]
+      },
+      {
+        src: "playworld/chat",
+        file: "views/world.ts",
+        symbols: [
+          ["hasWebGL", "fn", 0, 0],
+          ["createWorldStage", "fn", 1, 0]
+        ]
+      },
+      {
+        src: "playworld/original-app",
+        file: "llm/browser-tools.ts",
+        symbols: [
+          ["requireString", "fn", 0, 0],
+          ["requireNumber", "fn", 0, 0],
+          ["requireVec3", "fn", 0, 0],
+          ["resultError", "fn", 0, 0],
+          ["parseSpawnArgs", "fn", 0, 0],
+          ["parseTerrainArgs", "fn", 0, 0],
+          ["parseSpawnPrimitiveArgs", "fn", 0, 0],
+          ["parseMaterialArgs", "fn", 0, 0],
+          ["executeAnnotationTool", "fn", 0, 0],
+          ["executeBrowserTool", "fn", 1, 0],
+          ["registerBrowserBridge", "fn", 1, 0]
+        ]
+      },
+      {
+        src: "playworld/original-app",
+        file: "world-switcher.ts",
+        symbols: [
+          ["getCurrentWorldId", "fn", 1, 0],
+          ["getWorldParam", "fn", 1, 0],
+          ["initWorldSwitcher", "fn", 1, 0],
+          ["fetchWorlds", "fn", 0, 0],
+          ["render", "fn", 0, 0],
+          ["bindEvents", "fn", 0, 0],
+          ["createAndSwitch", "fn", 0, 0],
+          ["switchTo", "fn", 0, 0]
+        ]
+      }
+    )
+
+    const decisionLabels = {
+      port: "port",
+      adapt: "adapt",
+      included: "included",
+      "keep-app": "keep app",
+      experimental: "experimental"
+    }
+
+    function badge (value, label) {
+      const element = document.createElement("span")
+      element.dataset.badge = value
+      element.textContent = label || value
+      return element
+    }
+
+    function sourceLink (source, file) {
+      const link = document.createElement("a")
+      link.href = sourceRoots[source] + file
+      link.textContent = source + "/" + file
+      return link
+    }
+
+    function roadmapHaystack (item) {
+      return [
+        item.name,
+        item.area,
+        item.decision,
+        item.priority,
+        item.functions.join(" "),
+        item.summary,
+        item.boundary,
+        item.sources.flat().join(" ")
+      ].join(" ").toLowerCase()
+    }
+
+    function renderRoadmap () {
+      const query = document.querySelector("#roadmap-search").value.trim().toLowerCase()
+      const decision = document.querySelector("#roadmap-decision").value
+      const priority = document.querySelector("#roadmap-priority").value
+      const source = document.querySelector("#roadmap-source").value
+      const rows = document.querySelector("#roadmap-rows")
+      rows.replaceChildren()
+
+      const visible = roadmap.filter(item =>
+        (!query || roadmapHaystack(item).includes(query)) &&
+        (!decision || item.decision === decision) &&
+        (!priority || item.priority === priority) &&
+        (!source || item.sources.some(entry => entry[0] === source))
+      )
+
+      for (const item of visible) {
+        const row = document.createElement("tr")
+
+        const name = document.createElement("td")
+        const heading = document.createElement("strong")
+        heading.textContent = item.name
+        name.append(heading, document.createElement("br"), badge(item.area, item.area))
+
+        const state = document.createElement("td")
+        state.append(badge(item.decision, decisionLabels[item.decision]), badge(item.priority, item.priority))
+
+        const functions = document.createElement("td")
+        functions.dataset.functions = ""
+        const functionCode = document.createElement("code")
+        functionCode.textContent = item.functions.join(", ")
+        functions.append(functionCode)
+
+        const summary = document.createElement("td")
+        summary.dataset.summary = ""
+        const reason = document.createElement("p")
+        reason.textContent = item.summary
+        const boundary = document.createElement("p")
+        const strong = document.createElement("strong")
+        strong.textContent = "boundary: "
+        boundary.append(strong, item.boundary)
+        summary.append(reason, boundary)
+
+        const sources = document.createElement("td")
+        sources.dataset.sources = ""
+        item.sources.forEach((entry, index) => {
+          if (index)
+            sources.append(document.createElement("br"))
+          sources.append(sourceLink(entry[0], entry[1]))
+        })
+
+        row.append(name, state, functions, summary, sources)
+        rows.append(row)
+      }
+
+      document.querySelector("#roadmap-count").value = visible.length + " of " + roadmap.length + " module families"
+    }
+
+    function inventoryState (entry) {
+      const overlaps = entry.symbols.filter(symbol => symbol[3] === 1).length
+      if (!overlaps)
+        return "candidate"
+      if (overlaps === entry.symbols.length)
+        return "overlap"
+      return "mixed"
+    }
+
+    function inventoryHaystack (entry) {
+      return [
+        entry.src,
+        entry.file,
+        entry.symbols.map(symbol => symbol[0]).join(" ")
+      ].join(" ").toLowerCase()
+    }
+
+    function renderInventory () {
+      const query = document.querySelector("#inventory-search").value.trim().toLowerCase()
+      const source = document.querySelector("#inventory-source").value
+      const visibility = document.querySelector("#inventory-visibility").value
+      const overlap = document.querySelector("#inventory-overlap").value
+      const rows = document.querySelector("#inventory-rows")
+      rows.replaceChildren()
+
+      const visible = rawInventory.filter(entry => {
+        const hasPublic = entry.symbols.some(symbol => symbol[2] === 1)
+        const hasInternal = entry.symbols.some(symbol => symbol[2] === 0)
+        const visibilityMatches = !visibility || (visibility === "public" ? hasPublic : hasInternal)
+        return (!query || inventoryHaystack(entry).includes(query)) &&
+          (!source || entry.src === source) &&
+          visibilityMatches &&
+          (!overlap || inventoryState(entry) === overlap)
+      })
+
+      for (const entry of visible) {
+        const row = document.createElement("tr")
+
+        const source = document.createElement("td")
+        source.append(badge(entry.src, entry.src))
+
+        const file = document.createElement("td")
+        file.append(sourceLink(entry.src, entry.file))
+
+        const state = document.createElement("td")
+        const moduleState = inventoryState(entry)
+        state.append(badge(moduleState, moduleState === "overlap" ? "name overlap" : moduleState))
+        if (entry.symbols.some(symbol => symbol[2] === 1))
+          state.append(badge("public", "public"))
+        if (entry.symbols.some(symbol => symbol[2] === 0))
+          state.append(badge("internal", "internal"))
+
+        const symbols = document.createElement("td")
+        symbols.dataset.symbols = ""
+        for (const symbol of entry.symbols) {
+          if (visibility === "public" && symbol[2] !== 1)
+            continue
+          if (visibility === "internal" && symbol[2] !== 0)
+            continue
+          const code = document.createElement("code")
+          code.dataset.overlap = symbol[3] === 1 ? "true" : "false"
+          code.title = (symbol[2] === 1 ? "public " : "internal ") + symbol[1] + (symbol[3] === 1 ? " · exact-name overlap" : " · candidate name")
+          code.textContent = symbol[0]
+          symbols.append(code)
+        }
+
+        row.append(source, file, state, symbols)
+        rows.append(row)
+      }
+
+      const symbolCount = visible.reduce((total, entry) => total + entry.symbols.filter(symbol =>
+        !visibility || (visibility === "public" ? symbol[2] === 1 : symbol[2] === 0)
+      ).length, 0)
+      document.querySelector("#inventory-count").value = visible.length + " modules · " + symbolCount + " visible symbols"
+    }
+
+    const v3Inventory = rawInventory.filter(entry => entry.src === "threejs-scenes")
+    document.querySelector("#metric-source-symbols").textContent = String(
+      rawInventory.reduce((total, entry) => total + entry.symbols.length, 0)
+    )
+    document.querySelector("#metric-v3-symbols").textContent = String(
+      v3Inventory.reduce((total, entry) => total + entry.symbols.length, 0)
+    )
+    document.querySelector("#metric-v3-overlap").textContent = String(
+      v3Inventory.reduce((total, entry) => total + entry.symbols.filter(symbol => symbol[3] === 1).length, 0)
+    )
+    document.querySelector("#metric-roadmap").textContent = String(roadmap.length)
+
+    for (const control of document.querySelectorAll("#roadmap-filters input, #roadmap-filters select"))
+      control.addEventListener("input", renderRoadmap)
+
+    for (const control of document.querySelectorAll("#inventory-filters input, #inventory-filters select"))
+      control.addEventListener("input", renderInventory)
+
+    renderRoadmap()
+    renderInventory()
+  </script>
+</body>
+</html>

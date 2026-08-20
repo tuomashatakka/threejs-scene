@@ -2,6 +2,28 @@
 
 Newest first. One entry per release: the headline, then what it costs a consumer.
 
+## 0.5.1
+
+**The gesture layer gains a lifecycle, and loses a tap nobody made.**
+
+`attachPointerGesture` described a gesture but never said when one began or ended, which left the two things a consumer most needs to do at a press — latch what
+the gesture *means*, and stop whatever was driving the view automatically — with nowhere to go. An isometric scene migrating onto it found all of this by trying.
+
+- **Added `onPressStart(x, y, event)` and `onPressEnd(event)`**, bracketing the whole gesture and firing once however many pointers join it. This is where a
+  consumer latches which mouse button or modifier was held, focuses the element so it can take key events, or leaves a follow camera. A press is an act of intent
+  even when it never becomes a drag: deciding on the first *move* makes press-and-hold do nothing, and re-reading modifiers per move makes releasing shift
+  mid-drag change the verb underneath the reader's hand.
+- **Fixed: a two-finger gesture could fire a tap nobody made.** The tap check runs when the *last* pointer leaves, but the press it measures against was recorded
+  by the *first* — so a pinch ending near where it began, quickly enough, read as a tap. Now suppressed for any gesture that was ever more than one pointer, and
+  the guard clears so the element still taps afterwards.
+- **`onPinch` gained `panX`/`panY`**, how far the pinch centre travelled since the last move. A two-finger pinch is almost always a two-finger *drag* as well, and
+  rederiving that from the absolute centre is a thing every caller would otherwise write for itself. **Breaking only for callers that assert on the exact
+  arity** — the existing three arguments are unchanged and in the same positions.
+- **Fixed: `lostpointercapture` did not end a pointer.** A capture lost to the browser — a system gesture, a finger dragged off the element — leaves a pointer
+  that will never move again tracked forever, and the gesture open behind it.
+
+**Cost:** nothing. One extra boolean of state per element, no new per-frame work, no new dependency.
+
 ## 0.5.0
 
 **Seeing a geometry without a browser, and the ribbon three scenes kept rewriting.**

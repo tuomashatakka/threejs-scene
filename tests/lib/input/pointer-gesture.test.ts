@@ -67,7 +67,107 @@ describe('attachPointerGesture', () => {
     el.emit('pointerdown', pointer(2, 10, 0))
     el.emit('pointermove', pointer(2, 20, 0))
 
-    expect(onPinch).toHaveBeenCalledWith(2, 10, 0)
+    // The centre travelled from 5 to 10 while the fingers spread, so a pinch
+    // carries a pan as well — which is what a two-finger gesture on a map is.
+    expect(onPinch).toHaveBeenCalledWith(2, 10, 0, 5, 0)
+  })
+
+  it('reports the pinch centre travelling as the fingers move', () => {
+    const onPinch = vi.fn()
+    const { el }  = attach({ onPinch })
+
+    el.emit('pointerdown', pointer(1, 0, 0))
+    el.emit('pointerdown', pointer(2, 10, 0))
+    el.emit('pointermove', pointer(1, 4, 0))
+    el.emit('pointermove', pointer(2, 14, 0))
+
+    // Fingers arrive one event at a time, so a two-finger drag is a sequence of
+    // lopsided moves: the gap closes to 6 and opens back to 10. Each step
+    // carries its own ratio, and the centre walks 2 with every one of them.
+    const calls = onPinch.mock.calls
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toEqual([ 0.6, 7, 0, 2, 0 ])
+    expect(calls[1]?.[3]).toBe(2)
+
+    // Net over the whole gesture: the fingers ended as far apart as they began.
+    expect(calls[0]![0] * calls[1]![0]).toBeCloseTo(1)
+  })
+
+  it('brackets a gesture with onPressStart and onPressEnd', () => {
+    const onPressStart = vi.fn()
+    const onPressEnd   = vi.fn()
+    const { el }       = attach({ onPressStart, onPressEnd })
+
+    el.emit('pointerdown', pointer(1, 3, 4))
+    expect(onPressStart).toHaveBeenCalledWith(3, 4, expect.anything())
+    expect(onPressEnd).not.toHaveBeenCalled()
+
+    el.emit('pointerup', pointer(1, 3, 4))
+    expect(onPressEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts a press once however many pointers join it', () => {
+    const onPressStart = vi.fn()
+    const onPressEnd   = vi.fn()
+    const { el }       = attach({ onPressStart, onPressEnd })
+
+    el.emit('pointerdown', pointer(1, 0, 0))
+    el.emit('pointerdown', pointer(2, 10, 0))
+    el.emit('pointerup', pointer(1, 0, 0))
+
+    expect(onPressStart).toHaveBeenCalledTimes(1)
+    // One finger is still down: the gesture is not over.
+    expect(onPressEnd).not.toHaveBeenCalled()
+
+    el.emit('pointerup', pointer(2, 10, 0))
+    expect(onPressEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not invent a tap when a two-finger gesture ends', () => {
+    const onTap  = vi.fn()
+    const { el } = attach({ onTap })
+
+    // A pinch that ends close to where it began, quickly. The tap check runs
+    // when the last pointer leaves but measures against the press the first one
+    // recorded, so without a multi-touch guard this reads as a tap nobody made.
+    el.emit('pointerdown', pointer(1, 0, 0))
+    el.emit('pointerdown', pointer(2, 2, 0))
+    el.emit('pointerup', pointer(1, 0, 0))
+    el.emit('pointerup', pointer(2, 2, 0))
+
+    expect(onTap).not.toHaveBeenCalled()
+  })
+
+  it('taps again after a multi-touch gesture has ended', () => {
+    const onTap  = vi.fn()
+    const { el } = attach({ onTap })
+
+    el.emit('pointerdown', pointer(1, 0, 0))
+    el.emit('pointerdown', pointer(2, 2, 0))
+    el.emit('pointerup', pointer(1, 0, 0))
+    el.emit('pointerup', pointer(2, 2, 0))
+
+    // The guard must clear, or the element never taps again.
+    el.emit('pointerdown', pointer(3, 5, 5))
+    el.emit('pointerup', pointer(3, 5, 5))
+
+    expect(onTap).toHaveBeenCalledWith(5, 5, expect.anything())
+  })
+
+  it('ends the gesture when the browser takes the capture away', () => {
+    const onPressEnd = vi.fn()
+    const onDrag     = vi.fn()
+    const { el }     = attach({ onPressEnd, onDrag })
+
+    el.emit('pointerdown', pointer(1, 0, 0))
+    el.emit('lostpointercapture', pointer(1, 0, 0))
+
+    expect(onPressEnd).toHaveBeenCalledTimes(1)
+
+    // A pointer that will never move again must not still be tracked.
+    el.emit('pointermove', pointer(1, 40, 40))
+    expect(onDrag).not.toHaveBeenCalled()
   })
 
   it('fires onTap for a quick press without movement', () => {

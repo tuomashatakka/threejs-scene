@@ -8,8 +8,35 @@
  * and pen — always prefer this over discrete mouse/touch listeners.
  */
 export interface PointerGestureCallbacks {
-  onDrag?:  (dx: number, dy: number, event: PointerEvent) => void
-  onPinch?: (deltaScale: number, centerX: number, centerY: number) => void
+
+  /**
+   * The first pointer went down. Fires before any drag, and once per gesture
+   * however many pointers join it.
+   *
+   * This is where a consumer latches whatever the gesture means: which mouse
+   * button or modifier was held, focusing the element so it can take key
+   * events, or leaving whatever was driving the view automatically. A press is
+   * an act of intent even when it never becomes a drag — deciding on the first
+   * *move* instead makes press-and-hold do nothing, and re-reading modifiers
+   * per move makes releasing shift mid-drag change the verb underneath the
+   * reader's hand.
+   */
+  onPressStart?: (x: number, y: number, event: PointerEvent) => void
+
+  /** The last pointer lifted or was cancelled. The counterpart to {@link PointerGestureCallbacks.onPressStart}. */
+  onPressEnd?: (event: PointerEvent) => void
+
+  onDrag?: (dx: number, dy: number, event: PointerEvent) => void
+
+  /**
+   * Two pointers moved. `deltaScale` is the distance ratio to the previous move
+   * (>1 zoom in), `centerX`/`centerY` the pinch centre, and `panX`/`panY` how
+   * far that centre travelled since the last move — a two-finger pinch is
+   * almost always a two-finger *drag* as well, and rederiving that from the
+   * absolute centre is a thing every caller would otherwise write itself.
+   */
+  onPinch?: (deltaScale: number, centerX: number, centerY: number, panX: number, panY: number) => void
+
   onTap?:   (x: number, y: number, event: PointerEvent) => void
   onWheel?: (delta: number, event: WheelEvent) => void
 
@@ -55,10 +82,11 @@ interface TrackedPointer {
  *
  * Single-pointer moves fire `onDrag` with per-move deltas in CSS pixels;
  * two-pointer moves fire `onPinch` with the distance ratio to the previous
- * move (>1 zoom in) plus the pinch center; a press released within the tap
- * thresholds fires `onTap`; `onWheel` receives the raw `deltaY` and calls
- * `preventDefault()` on the event. `onHover` fires on every move regardless of
- * button state, and `onLeave` when the pointer exits the element.
+ * move (>1 zoom in), the pinch center, and how far that center travelled; a
+ * press released within the tap thresholds fires `onTap`; `onWheel` receives
+ * the raw `deltaY` and calls `preventDefault()` on the event. `onPressStart`
+ * and `onPressEnd` bracket the whole gesture, `onHover` fires on every move
+ * regardless of button state, and `onLeave` when the pointer exits the element.
  *
  * @param el - Element to listen on, typically the render canvas. Its
  * `touch-action` style is set to `none` to disable native panning/zooming.
@@ -74,9 +102,21 @@ export function attachPointerGesture (
 ): () => void {
   const pointers = new Map<number, TrackedPointer>()
   let lastPinchDist = 0
+  let lastCenterX   = 0
+  let lastCenterY   = 0
   let downAt        = 0
   let downX         = 0
   let downY         = 0
+
+  /**
+   * Whether this gesture was ever more than one pointer.
+   *
+   * Without it, lifting two fingers in quick succession fires a tap nobody
+   * made: the tap check runs when the *last* pointer leaves, but the press it
+   * measures against was recorded by the *first*. So a pinch that ends near
+   * where it began, quickly enough, reads as a tap.
+   */
+  let multiTouch = false
 
   // critical: disable native gesture handling on the canvas
   el.style.touchAction = 'none'
@@ -97,12 +137,18 @@ export function attachPointerGesture (
       downAt = performance.now()
       downX = e.clientX
       downY = e.clientY
+      callbacks.onPressStart?.(e.clientX, e.clientY, e)
     }
     else if (pointers.size === 2) {
       const [ a, b ] = [ ...pointers.values() ]
-      if (a && b)
+      if (a && b) {
         lastPinchDist = Math.hypot(a.x - b.x, a.y - b.y)
+        lastCenterX = (a.x + b.x) / 2
+        lastCenterY = (a.y + b.y) / 2
+      }
     }
+
+    multiTouch ||= pointers.size > 1
   }
 
   const onMove = (e: PointerEvent): void => {
@@ -125,9 +171,19 @@ export function attachPointerGesture (
       const dist    = Math.hypot(a.x - b.x, a.y - b.y)
       const centerX = (a.x + b.x) / 2
       const centerY = (a.y + b.y) / 2
+
       if (lastPinchDist > 0)
-        callbacks.onPinch(dist / lastPinchDist, centerX, centerY)
+        callbacks.onPinch(
+          dist / lastPinchDist,
+          centerX,
+          centerY,
+          centerX - lastCenterX,
+          centerY - lastCenterY,
+        )
+
       lastPinchDist = dist
+      lastCenterX = centerX
+      lastCenterY = centerY
     }
   }
 
@@ -137,11 +193,15 @@ export function attachPointerGesture (
     if (pointers.size < 2)
       lastPinchDist = 0
 
-    if (p && pointers.size === 0 && callbacks.onTap) {
+    if (p && pointers.size === 0) {
       const dt    = performance.now() - downAt
       const moved = Math.hypot(p.x - downX, p.y - downY)
-      if (dt < tapThresholdMs && moved < tapMovePx)
-        callbacks.onTap(p.x, p.y, e)
+
+      if (!multiTouch && dt < tapThresholdMs && moved < tapMovePx)
+        callbacks.onTap?.(p.x, p.y, e)
+
+      multiTouch = false
+      callbacks.onPressEnd?.(e)
     }
   }
 
@@ -160,6 +220,10 @@ export function attachPointerGesture (
   el.addEventListener('pointermove', onMove)
   el.addEventListener('pointerup', onUp)
   el.addEventListener('pointercancel', onUp)
+  // A capture lost to the browser — a system gesture, a dragged-away finger —
+  // ends the pointer as surely as lifting it, and without this the gesture
+  // stays open forever with a pointer that will never move again.
+  el.addEventListener('lostpointercapture', onUp)
   el.addEventListener('pointerleave', onLeave)
   el.addEventListener('contextmenu', onSecondaryDown)
   el.addEventListener('wheel', onWheel, { passive: false })
@@ -169,6 +233,7 @@ export function attachPointerGesture (
     el.removeEventListener('pointermove', onMove)
     el.removeEventListener('pointerup', onUp)
     el.removeEventListener('pointercancel', onUp)
+    el.removeEventListener('lostpointercapture', onUp)
     el.removeEventListener('pointerleave', onLeave)
     el.removeEventListener('contextmenu', onSecondaryDown)
     el.removeEventListener('wheel', onWheel)
