@@ -22,7 +22,10 @@ export type { FrameLoopOptions } from './time/loop.js'
 // state — what the world is
 export { createStore } from './state/store.js'
 export { createSeededRng, hash2, hash3, lerp, mulberry32, smoothstep, valueNoise1d } from './state/rng.js'
-export { readPath, writePath, readNumberPath, readTextPath } from './state/path.js'
+export { readPath, writePath, readNumberPath, readTextPath, withPath } from './state/path.js'
+export { openStorage } from './state/storage.js'
+export { createStateAccess } from './state/access.js'
+export type { StateAccess, StateValue } from './state/access.js'
 export type { Store, Reducer, StoreListener } from './state/store.js'
 
 // camera — prebuilt rigs for createApp's `camera` option
@@ -32,6 +35,17 @@ export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions
 // render — how it reaches the screen
 export { createRenderer } from './render/renderer.js'
 export { attachResizeObserver } from './render/resize.js'
+export {
+  auditPrograms,
+  censusProgram,
+  censusPrograms,
+  describeCensus,
+  packedRows,
+  readVaryings,
+  reportPrograms,
+  varyingRowLimit,
+} from './render/audit.js'
+export type { AuditReport, ProgramCensus, ProgramFault, VaryingCount } from './render/audit.js'
 export type { RendererOptions } from './render/renderer.js'
 export type { ResizeHandler } from './render/resize.js'
 
@@ -42,3 +56,10 @@ export type { DisposeMeshOptions } from './lifecycle/dispose.js'
 // input — how intent enters the system
 export { attachPointerGesture } from './input/pointer-gesture.js'
 export type { PointerGestureCallbacks, PointerGestureOptions } from './input/pointer-gesture.js'
+export { readQualitySignals, describeQualitySignals, createLadderMemory } from './quality/index.js'
+export type {
+  LadderMemory,
+  LadderMemoryOptions,
+  QualitySignalOptions,
+  QualitySignals,
+} from './quality/index.js'

@@ -278,3 +278,71 @@ export function createMatcapTexture ({
 
 // perf: cheap, but each texture is size² × 4 bytes on the GPU. Build once and
 // share; dispose on teardown.
+
+
+export interface AlphaFieldOptions {
+
+  /** Both axes. @defaultValue `THREE.MirroredRepeatWrapping` */
+  wrap?: THREE.Wrapping
+
+  // Set only when given — leaving three's default alone is not the same as
+  // assigning it, since assigning marks the texture for reupload.
+  colorSpace?: THREE.ColorSpace
+}
+
+/**
+ * Bake a caller-painted RGBA field into a `DataTexture`.
+ *
+ * For the billboard-sheet pattern: a layer paints its own noise and falloff into
+ * a square byte buffer, and everything *around* that — allocating the buffer,
+ * wrapping it, both wrap modes, both filters, `needsUpdate` — is identical every
+ * time. Several sheets in one scene means writing those seven lines out once per
+ * sheet, where only the painting differs.
+ *
+ * Mirrored wrapping is the default because a sheet scrolled on wind reveals its
+ * own seam under plain `Repeat`, and mirroring hides it without a seamless
+ * generator. Pass `wrap` when the field is already seamless, or when the tiling
+ * is meant to be visible.
+ *
+ * @param size - Texels per side. The buffer handed to `sampler` is
+ * `size * size * 4` bytes, RGBA, row-major.
+ * @param sampler - Paints the field in place. Called exactly once, before the
+ * texture is built.
+ * @param options - See {@link AlphaFieldOptions}.
+ * @returns The finished texture, already flagged for upload.
+ *
+ * @example
+ * const mist = bakeAlphaField(256, field => {
+ *   for (let i = 0; i < 256 * 256; i += 1) {
+ *     const a = myNoise(i % 256, Math.floor(i / 256))
+ *     field[i * 4 + 0] = 255
+ *     field[i * 4 + 1] = 255
+ *     field[i * 4 + 2] = 255
+ *     field[i * 4 + 3] = a * 255
+ *   }
+ * })
+ */
+export function bakeAlphaField (
+  size: number,
+  sampler: (field: Uint8Array) => void,
+  options: AlphaFieldOptions = {},
+): THREE.DataTexture {
+  const field = new Uint8Array(size * size * 4)
+
+  sampler(field)
+
+  const texture = new THREE.DataTexture(field, size, size, THREE.RGBAFormat)
+  const wrap    = options.wrap ?? THREE.MirroredRepeatWrapping
+
+  texture.wrapS     = wrap
+  texture.wrapT     = wrap
+  texture.magFilter = THREE.LinearFilter
+  texture.minFilter = THREE.LinearFilter
+
+  if (options.colorSpace)
+    texture.colorSpace = options.colorSpace
+
+  texture.needsUpdate = true
+
+  return texture
+}

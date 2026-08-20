@@ -56,3 +56,63 @@ export function readTextPath (root: object, path: string, fallback = ''): string
 
   return typeof value === 'string' ? value : fallback
 }
+
+/**
+ * `writePath`, without mutating what it writes into.
+ *
+ * {@link createStore} commits a *new* object on every write, so a consumer still
+ * holding the object from before the write goes on reading the values from
+ * before it. Replacing only the spine of the path is what keeps that cheap:
+ * setting `look.bloom` on a state of twenty sections copies two objects and
+ * keeps the other eighteen by reference, so the frame after a slider moves
+ * allocates almost nothing.
+ *
+ * Semantics are {@link writePath}'s, deliberately, because the same dotted
+ * strings arrive from a slider, a url, a stored snapshot and a headless flag:
+ * every write is silent. A path whose parent does not resolve writes nothing
+ * rather than inventing the shape it would need, because a stale key in a saved
+ * preference set must not take the app down on boot.
+ *
+ * @param state - The object to write into. Not mutated.
+ * @param path - Dotted path to the leaf, e.g. `'look.bloom'`.
+ * @param value - What to put there.
+ * @returns The next state, or `state` itself when the write changed nothing —
+ * which is what lets a store skip notifying its listeners.
+ */
+export function withPath<S extends object> (state: S, path: string, value: unknown): S {
+  const keys = path.split('.')
+
+  if (keys.some(key => key === ''))
+    return state
+
+  return spine(state, keys, value) as S ?? state
+}
+
+/**
+ * Copy `node` along `keys`, and nothing else.
+ *
+ * @returns The replacement, `node` itself when the write changed nothing, or
+ * `undefined` when the path ran into something that is not an object — the dead
+ * path {@link writePath} would silently skip.
+ */
+function spine (node: unknown, keys: readonly string[], value: unknown): unknown {
+  const [ key, ...rest ] = keys
+
+  if (key === undefined || typeof node !== 'object' || node === null)
+    return undefined
+
+  const record = node as Record<string, unknown>
+
+  // Writing the value it already holds is not a change, and a store that
+  // notifies on identity would otherwise wake every subscriber to report that
+  // nothing happened.
+  if (rest.length === 0)
+    return record[key] === value ? node : { ...record, [key]: value }
+
+  const next = spine(record[key], rest, value)
+
+  if (next === undefined)
+    return undefined
+
+  return next === record[key] ? node : { ...record, [key]: next }
+}

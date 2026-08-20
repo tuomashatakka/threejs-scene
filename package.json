@@ -1,6 +1,6 @@
 {
   "name": "threejs-scene",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Deterministic imperative three.js scenes with an LLM-first procedural asset toolkit, fixed-step physics, and explicit disposal.",
   "type": "module",
   "main": "./dist/cjs/lib/index.js",

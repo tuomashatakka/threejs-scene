@@ -422,11 +422,112 @@ re-aims a built rig at runtime, falling back to whatever pose it already has for
 every field you omit, so a zoom handler can swing the tilt without knowing the
 rest of the setup.
 
+## Surviving the device you did not test on
+
+Three pieces for the situation where a scene works everywhere except on somebody's
+phone.
+
+**Read the driver's verdict before you draw.** three links every program up front
+but does not *check* the link until the program's first use — so a program that
+will not link is bound to a draw anyway, every draw against it raises
+`INVALID_OPERATION`, and the context is eventually taken away. The loss lands
+seconds after load, whenever the offending material first came into view, which
+is why it reads as thermal rather than as a compile error.
+
+```ts
+import { reportPrograms } from 'threejs-scene'
+
+// After the scene is built, before the loop starts.
+const halt = reportPrograms(app.ctx.renderer, {
+  say:  message => log(message),
+  fail: message => log(message),
+}, false)
+
+if (!halt)
+  app.start()
+```
+
+`true` means keep the loop stopped — the draws are what turn a refused program
+into a dead context, so a scene that never starts cannot lose one, and you get
+the failing material's name instead of a black screen.
+
+The other half is the varying census, for when a driver refuses a program and
+logs nothing about why. `readVaryings(source)` walks the `#ifdef`s and `#define`s
+*together*, so a varying declared inside a branch the shader never takes is not
+counted — `flatShading` wrapping `vNormal` in `#ifndef FLAT_SHADED` is exactly
+that case, and counting declarations flat gets it wrong. `packedRows` then packs
+them the way a driver does, and `varyingRowLimit(gl)` says how many rows this one
+has to spend. `censusPrograms` and `describeCensus` are the same thing per
+program, as a line you can print.
+
+**Pick a budget from what the device admits to.** `readQualitySignals()` reads
+the cheap proxies — coarse pointer, viewport size, `devicePixelRatio`, cores —
+and `describeQualitySignals` turns them into one line, because a tier that is
+wrong for a device is indistinguishable from a tier that is right and still too
+heavy unless you can read what it was picked from. Neither chooses anything: the
+mapping from signals to *your* budget is yours.
+
+**Remember what the device already proved.** A degradation ladder that re-learns
+its lesson on every load pays for it with a crash each time.
+
+```ts
+import { createLadderMemory, readQualitySignals } from 'threejs-scene'
+
+const memory = createLadderMemory({
+  ladder: [ 'minimal', 'mobile', 'desktop', 'ultra' ] as const,
+  key:    'app.tier',
+  build:  BUILD_SHA,          // a verdict is only about the code that earned it
+})
+
+const tier = memory.clamp(pickBudget(readQualitySignals()))
+// …once it has run a while without dying:
+memory.remember(tier)
+```
+
+It only ever argues *downward*. Something that survived the top step last week
+may be throttled or on battery now, so a stored high-water mark would be a way to
+push a device past what it can currently hold.
+
+## State that outlives one mount
+
+`createStore` commits a **new** object on every write, which is what makes change
+detection cheap and what makes a captured reference go stale. Two helpers for
+that.
+
+`withPath(state, path, value)` is `writePath` without the mutation: it copies
+only the spine of the path, so setting `look.bloom` on a state of twenty sections
+copies two objects and keeps the other eighteen. It returns the *same* object when
+the leaf already held that value, so a slider dragged across a value it is
+already on wakes no subscribers.
+
+`createStateAccess(authored)` answers "where does a write go" when the answer
+changes over time — a url is parsed before the app mounts, a saved snapshot is
+applied before it, and a context loss takes the app down and builds another one
+with the values the reader had moved rather than the ones that shipped.
+
+```ts
+const access  = createStateAccess(CONFIG)
+access.write('look.bloom', 0.9)             // pre-mount: a plain object
+
+const app     = createApp(canvas, { state: access.read(), use: [ … ] })
+const release = access.adopt(app.store)     // the store owns it from here
+
+access.write('look.bloom', 0.4)             // now a store commit
+release()                                   // teardown keeps the last value
+```
+
+`openStorage(probe)` is the matching `localStorage` probe: it throws on *access*
+in a sandboxed iframe or a spent private-mode quota, so a feature-detect has to be
+a real read inside a `try`. Returns `null` for "remember nothing" rather than
+throwing on boot in the environments least able to say why.
+
 ## Layout
 
-`lib/` is grouped by function — `time/` (clock, loop), `state/` (store, rng),
-`render/` (renderer, resize), `camera/` (iso + follow rigs), `lifecycle/`
-(dispose), `input/` (pointer-gesture), `app/` (composition root).
+`lib/` is grouped by function — `time/` (clock, loop), `state/` (store, rng,
+dotted paths, storage, ownership handoff), `render/` (renderer, resize, program
+audit), `camera/` (iso + follow rigs), `quality/` (device signals, ladder
+memory), `lifecycle/` (dispose), `input/` (pointer-gesture), `app/`
+(composition root).
 
 Every entry in `modules/` is a folder with an `index.ts` — `lighting/`,
 `orbit/`, `post/` (the post-processing module, its passes, `shared/` GLSL, and

@@ -20,6 +20,7 @@ export type { TriplanarMaterialOptions } from './triplanar-material.js'
 // textures — seeded, procedural, headless-safe
 export {
   createGridTexture,
+  bakeAlphaField,
   createNoiseTexture,
   createGradientTexture,
   createSeamlessNoiseTexture,

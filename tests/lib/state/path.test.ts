@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { readNumberPath, readPath, readTextPath, writePath } from 'Δ/index'
+import { readNumberPath, readPath, readTextPath, withPath, writePath } from 'Δ/index'
 
 
 describe('dotted config paths', () => {
@@ -46,5 +46,64 @@ describe('dotted config paths', () => {
     expect(readTextPath(config, 'look.name')).toBe('dusk')
     expect(readTextPath(config, 'look.bloom')).toBe('')
     expect(readTextPath(config, 'look.missing', 'fallback')).toBe('fallback')
+  })
+})
+
+
+describe('withPath', () => {
+  type SampleReturnType = { look: { bloom: number, grade: string }, camera: { viewSize: number }}
+
+  const sample = (): SampleReturnType => ({
+    look:   { bloom: 0.4, grade: 'noir' },
+    camera: { viewSize: 30 },
+  })
+
+  it('writes the leaf without mutating what it wrote into', () => {
+    const before = sample()
+    const after  = withPath(before, 'look.bloom', 0.9)
+
+    expect(after.look.bloom).toBe(0.9)
+    expect(before.look.bloom).toBe(0.4)
+  })
+
+  it('copies the spine and keeps everything off it by reference', () => {
+    const before = sample()
+    const after  = withPath(before, 'look.bloom', 0.9)
+
+    expect(after).not.toBe(before)
+    expect(after.look).not.toBe(before.look)
+    expect(after.camera).toBe(before.camera)
+  })
+
+  it('returns the same object when the leaf already held the value', () => {
+    const before = sample()
+
+    expect(withPath(before, 'look.bloom', 0.4)).toBe(before)
+    expect(withPath(before, 'look.grade', 'noir')).toBe(before)
+  })
+
+  it('is silent on a dead path, exactly as writePath is', () => {
+    const before = sample()
+
+    expect(withPath(before, 'nowhere.at.all', 1)).toBe(before)
+    expect(withPath(before, '', 1)).toBe(before)
+    expect(withPath(before, 'look..bloom', 1)).toBe(before)
+  })
+
+  it('writes a top-level leaf', () => {
+    const before = { seed: 1, look: { bloom: 0.4 }}
+    const after  = withPath(before, 'seed', 7)
+
+    expect(after.seed).toBe(7)
+    expect(after.look).toBe(before.look)
+  })
+
+  it('agrees with writePath on where the value lands', () => {
+    const mutated = sample()
+    const copied  = withPath(sample(), 'camera.viewSize', 42)
+
+    writePath(mutated, 'camera.viewSize', 42)
+
+    expect(copied).toEqual(mutated)
   })
 })
