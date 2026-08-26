@@ -17,9 +17,9 @@ const RADIAL_BLUR_SHADER = {
     tDiffuse:  { value: null },
     uCenter:   { value: new THREE.Vector2(0.5, 0.5) },
     uWeight:   { value: 1.0 },
-    uDecay:    { value: 0.92 },
+    uDecay:    { value: 0.9 },
     uExposure: { value: 1.0 },
-    uCount:    { value: 32 },
+    uCount:    { value: 64 },
   },
   vertexShader:   FULLSCREEN_VERTEX,
   fragmentShader: /* glsl */`
@@ -67,7 +67,7 @@ export interface RadialBlurOptions {
 }
 
 export function createRadialBlur (options: RadialBlurOptions = {}): Pass {
-  const { center = new THREE.Vector2(0.5, 0.5), weight = 1.0, decay = 0.92, count = 32, exposure = 1.0 } = options
+  const { center = new THREE.Vector2(0.5, 0.5), weight = 1.0, decay = 0.9, count = 64, exposure = 1.0 } = options
   const pass                                                                                             = new ShaderPass(RADIAL_BLUR_SHADER);
   (pass.uniforms.uCenter!.value as THREE.Vector2).copy(center)
   pass.uniforms.uWeight!.value   = weight

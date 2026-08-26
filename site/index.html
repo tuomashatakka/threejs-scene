@@ -113,8 +113,14 @@ const app = createApp(canvas, {
       <div><dt>lib/render</dt><dd>Renderer, resize — three.js renderer setup and viewport-resize handling.</dd></div>
       <div><dt>lib/lifecycle</dt><dd>Dispose — the strict teardown chain every module and the app itself follow.</dd></div>
       <div><dt>lib/input</dt><dd>Pointer-gesture — input capture that only ever reaches the scene through <code>dispatch</code>.</dd></div>
+      <div><dt>lib/camera</dt><dd>Camera rigs — isometric and follow cameras that <code>createApp</code> accepts directly through its <code>camera</code> option.</dd></div>
+      <div><dt>lib/quality</dt><dd>Quality signals — adaptive quality reads (perf signals, quality-ladder memory) for device-aware tuning.</dd></div>
       <div><dt>lib/app</dt><dd>Composition root — <code>createApp</code>, wiring clock, store, renderer and modules together.</dd></div>
-      <div><dt>modules/</dt><dd>Behavior modules (lighting, orbit, postprocessing) built entirely on the public surface.</dd></div>
+      <div><dt>modules/assets</dt><dd>Content layer — deterministic materials, procedural textures, and props you put <em>into</em> a scene.</dd></div>
+      <div><dt>modules/lighting</dt><dd>Lighting rig — the standard three-part IBL/sun/hemisphere lighting as an app module.</dd></div>
+      <div><dt>modules/orbit</dt><dd>Orbit controls — pointer-driven camera rotate/zoom as an app module.</dd></div>
+      <div><dt>modules/physics</dt><dd>Physics — optional rigid-body, cloth, and liquid layer stepped by a deterministic fixed-step world.</dd></div>
+      <div><dt>modules/post</dt><dd>Post-processing — pluggable EffectComposer module (bloom, god rays, grade, …) owning the frame draw.</dd></div>
     </dl>
   </section>
 

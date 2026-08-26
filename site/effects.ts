@@ -143,10 +143,10 @@ export function buildRegistry (ctx: EffectContext): Effect[] {
         P('exposure', 'exposure', 0, 1, 0.01, 0.25, (fx, v) => {
           uni(fx.pass!, 'uExposure').value = v
         }),
-        P('decay', 'decay', 0.8, 1, 0.001, 0.95, (fx, v) => {
+        P('decay', 'decay', 0.8, 1, 0.001, 0.9, (fx, v) => {
           uni(fx.pass!, 'uDecay').value = v
         }),
-        P('density', 'density', 0, 1.5, 0.01, 0.9, (fx, v) => {
+        P('density', 'density', 0, 1.5, 0.01, 0.33, (fx, v) => {
           uni(fx.pass!, 'uDensity').value = v
         }),
         P('weight', 'weight', 0, 1, 0.01, 0.4, (fx, v) => {
@@ -281,13 +281,13 @@ export function buildRegistry (ctx: EffectContext): Effect[] {
         P('weight', 'weight', 0, 1, 0.01, 1, (fx, v) => {
           uni(fx.pass!, 'uWeight').value = v
         }),
-        P('decay', 'decay', 0.8, 1, 0.001, 0.92, (fx, v) => {
+        P('decay', 'decay', 0.8, 1, 0.001, 0.9, (fx, v) => {
           uni(fx.pass!, 'uDecay').value = v
         }),
         P('exposure', 'exposure', 0, 3, 0.05, 1, (fx, v) => {
           uni(fx.pass!, 'uExposure').value = v
         }),
-        P('count', 'samples', 8, 128, 1, 32, (fx, v) => {
+        P('count', 'samples', 8, 128, 1, 64, (fx, v) => {
           uni(fx.pass!, 'uCount').value = v
         }),
       ]},
