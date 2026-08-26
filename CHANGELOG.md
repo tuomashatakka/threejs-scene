@@ -2,6 +2,16 @@
 
 Newest first. One entry per release: the headline, then what it costs a consumer.
 
+## 0.6.2
+
+**Tighter, cheaper light-shaft defaults.**
+
+- **God rays default `decay` 0.95 → 0.9 and `density` 0.9 → 0.33.** The previous `density` marched shafts too far per sample, blowing the scatter out; 0.33 keeps them tight. Applies to both the pass uniform and the demo panel.
+- **Radial (zoom) blur default `decay` 0.92 → 0.9 and `count` 32 → 64.** More taps for a smoother smear, with the matching decay falloff.
+- **Docs:** the public `index.html` Layout section now lists every available module (`lib/camera`, `lib/quality`, `modules/assets`, `modules/lighting`, `modules/orbit`, `modules/physics`, `modules/post`) rather than a partial set.
+
+Purely default-value and documentation changes — no API shapes moved, so this is a drop-in patch for every existing caller.
+
 ## 0.6.1
 
 **The package now tells an agent how to use it.**
