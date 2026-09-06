@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { SceneContext, FrameContext } from 'Δ/index'
+import { testModuleContext } from 'Δ/testing/index'
+
+import type { ModuleContext, FrameContext } from 'Δ/index'
 import type { EffectContext } from 'ꭍ/post'
 
 // Real EffectComposer needs a live WebGL context, so we mock the composer
@@ -25,14 +27,10 @@ vi.mock('../../modules/post/composer.js', () => ({ createComposer: composerSpy }
 
 const { postProcessing } = await import('ꭍ/post')
 
-function fakeCtx (): SceneContext {
-  return {
-    scene:    new THREE.Scene(),
-    camera:   new THREE.PerspectiveCamera(),
+function fakeCtx (): ModuleContext {
+  return testModuleContext({
     renderer: { getSize: (v: THREE.Vector2) => v.set(800, 600) } as unknown as THREE.WebGLRenderer,
-    rng:      {} as SceneContext['rng'],
-    loop:     {} as SceneContext['loop'],
-  }
+  }).ctx
 }
 
 const frame = (delta: number): FrameContext => ({ delta, elapsed: delta, frame: 1 })
