@@ -23,6 +23,17 @@ export {
   registerModule,
 } from './app/registry.js'
 export { consoleReporter, deepFreeze, resolveStrict, violationOf } from './app/strict.js'
+export { AssetCatalog, CameraRig, Persistence, PointerInput, PostChain, Quality } from './app/capabilities.js'
+export type {
+  AssetCatalogApi,
+  CameraRigApi,
+  PersistenceApi,
+  PointerInputApi,
+  PointerState,
+  PostChainApi,
+  QualityApi,
+  QualityTier,
+} from './app/capabilities.js'
 export type { App, AppOptions, AppCameraOptions, AppSceneOptions, AppLoopOptions } from './app/create-app.js'
 export type {
   AnyAppModule,

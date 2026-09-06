@@ -68,7 +68,7 @@ export interface RadialBlurOptions {
 
 export function createRadialBlur (options: RadialBlurOptions = {}): Pass {
   const { center = new THREE.Vector2(0.5, 0.5), weight = 1.0, decay = 0.9, count = 64, exposure = 1.0 } = options
-  const pass                                                                                             = new ShaderPass(RADIAL_BLUR_SHADER);
+  const pass                                                                                            = new ShaderPass(RADIAL_BLUR_SHADER);
   (pass.uniforms.uCenter!.value as THREE.Vector2).copy(center)
   pass.uniforms.uWeight!.value   = weight
   pass.uniforms.uDecay!.value    = decay

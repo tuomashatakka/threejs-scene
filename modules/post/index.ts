@@ -15,9 +15,10 @@
 
 import * as THREE from 'three'
 
+import { PostChain, registerModule } from '../../lib/index.js'
 import { createComposer } from './composer.js'
 
-import type { AppModule, SceneContext, FrameContext, Size } from '../../lib/index.js'
+import type { AppModule, ModuleContext, SceneContext, FrameContext, Size } from '../../lib/index.js'
 import type { ComposerHandle } from './composer.js'
 import type { WebGlPassContext, Resizable, Pass } from './webgl/types.js'
 
@@ -124,21 +125,26 @@ export function postProcessing<S extends object = Record<string, unknown>> (
 
   let handle: ComposerHandle | null = null
   let passes: Pass[]                = []
+  let pixels: Size                  = { width: 1, height: 1 }
 
   return {
-    name: 'postprocessing',
+    name:     'postprocessing',
+    provides: [ PostChain ],
 
-    build (ctx: SceneContext) {
-      const size   = ctx.renderer.getSize(new THREE.Vector2())
-      const width  = size.x || 1
-      const height = size.y || 1
+    // the draw claim belongs last: whatever else mounts, the composer renders
+    order: 100,
+
+    build (ctx: ModuleContext<S, S>) {
+      const size = ctx.renderer.getSize(new THREE.Vector2())
+
+      pixels = { width: size.x || 1, height: size.y || 1 }
 
       handle = createComposer({
         renderer:       ctx.renderer,
         scene:          ctx.scene,
         camera:         ctx.camera,
-        width,
-        height,
+        width:          pixels.width,
+        height:         pixels.height,
         withDepth:      depth,
         withBloom:      bloom !== false,
         bloomStrength:  bloomOpts?.strength,
@@ -146,19 +152,42 @@ export function postProcessing<S extends object = Record<string, unknown>> (
         bloomThreshold: bloomOpts?.threshold,
       })
 
+      // the composer holds render targets, so it is an owned resource; the
+      // module's own dispose only has to cover the passes it did not create
+      ctx.onCleanup(() => {
+        for (const pass of passes)
+          (pass as { dispose?: () => void }).dispose?.()
+
+        handle?.bloom?.dispose()
+        handle?.dispose()
+        handle = null
+        passes = []
+      })
+
       if (effects) {
         passes = effects({
           renderer:     ctx.renderer,
           scene:        ctx.scene,
           camera:       ctx.camera,
-          width,
-          height,
+          width:        pixels.width,
+          height:       pixels.height,
           composer:     handle.composer,
           depthTexture: handle.composer.renderTarget1.depthTexture ?? null,
         })
+
         for (const pass of passes)
           handle.addPassBeforeOutput(pass)
       }
+
+      ctx.provide(PostChain, {
+        addPass (pass) {
+          passes.push(pass as Pass)
+          handle?.addPassBeforeOutput(pass as Pass)
+        },
+        get size () {
+          return pixels
+        },
+      })
     },
 
     update (_state: S, frame: FrameContext, ctx: SceneContext) {
@@ -166,27 +195,43 @@ export function postProcessing<S extends object = Record<string, unknown>> (
     },
 
     resize (size, ctx) {
+      pixels = size
       handle?.setSize(size.width, size.height)
+
       // resolution-dependent passes carry their own setSize (see Resizable)
       for (const pass of passes)
         (pass as Partial<Resizable>).setSize?.(size.width, size.height)
+
       onResize?.(size, ctx)
     },
 
     render (frame: FrameContext) {
       handle?.composer.render(frame.delta)
     },
-
-    dispose () {
-      for (const pass of passes)
-        (pass as { dispose?: () => void }).dispose?.()
-      handle?.bloom?.dispose()
-      handle?.dispose()
-      handle = null
-      passes = []
-    },
   }
 }
+
+/** Registry entry — see {@link listModules}. */
+export const descriptor = registerModule({
+  id:    'postprocessing',
+  title: 'Post-processing chain',
+  summary:
+    'An EffectComposer as a module: RenderPass -> optional UnrealBloom -> your passes -> OutputPass. ' +
+    'Claims the frame draw, so mounting it is all the wiring there is. Ordered last on purpose.',
+  subpath:  'threejs-scene/modules/post',
+  factory:  'postProcessing',
+  tags:     [ 'post', 'render' ],
+  cost:     'heavy',
+  provides: [ PostChain ],
+  options:  [
+    { name: 'bloom', type: 'PostProcessingBloom | false', summary: 'UnrealBloom in the base chain, or false to omit it', default: '{}' },
+    { name: 'depth', type: 'boolean', summary: 'attach a shared depth texture — required by DOF, god rays, motion blur', default: 'false' },
+    { name: 'effects', type: '(ctx: EffectContext) => Pass[]', summary: 'build the custom passes to insert before tone-mapping' },
+    { name: 'onFrame', type: '(frame, ctx) => void', summary: 'per-tick hook for time/camera-dependent pass uniforms' },
+    { name: 'onResize', type: '(size, ctx) => void', summary: 'per-resize hook for passes that track resolution in a plain uniform' },
+  ],
+  create: (options?: PostProcessingOptions) => postProcessing(options),
+})
 
 // perf: one composer render per frame = N fullscreen passes. Bloom + any
 // depth-sampling pass dominate; gate heavy effects behind a quality tier.

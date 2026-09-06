@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
+import { PostChain } from 'Δ/index'
 import { testModuleContext } from 'Δ/testing/index'
 
-import type { ModuleContext, FrameContext } from 'Δ/index'
+import type { ModuleContext, FrameContext, PostChainApi } from 'Δ/index'
 import type { EffectContext } from 'ꭍ/post'
 
 // Real EffectComposer needs a live WebGL context, so we mock the composer
@@ -36,13 +37,16 @@ function fakeCtx (): ModuleContext {
 const frame = (delta: number): FrameContext => ({ delta, elapsed: delta, frame: 1 })
 
 describe('postProcessing', () => {
-  it('is a pluggable AppModule with a render hook', () => {
+  it('is a pluggable AppModule that claims the draw and orders itself last', () => {
     const mod = postProcessing()
     expect(mod.name).toBe('postprocessing')
     expect(typeof mod.build).toBe('function')
     expect(typeof mod.render).toBe('function')
     expect(typeof mod.resize).toBe('function')
-    expect(typeof mod.dispose).toBe('function')
+
+    // ordered after everything else so the composer, not a peer, owns the frame
+    expect(mod.order).toBeGreaterThan(0)
+    expect(mod.provides).toContain(PostChain)
   })
 
   it('builds a composer sized to the renderer, bloom on by default', () => {
@@ -120,18 +124,42 @@ describe('postProcessing', () => {
     expect(onResize).toHaveBeenCalledWith({ width: 640, height: 480 }, ctx)
   })
 
-  it('dispose tears down passes, bloom, and the composer', () => {
+  // teardown is registered with ctx.onCleanup rather than written into
+  // `dispose`, so the runtime runs it whether the module remembered or not
+  it('scoped cleanup tears down passes, bloom, and the composer', () => {
     handle.dispose.mockClear()
     handle.bloom.dispose.mockClear()
 
-    const dispose = vi.fn()
-    const pass    = { enabled: true, dispose } as never
-    const mod     = postProcessing({ effects: () => [ pass ]})
-    mod.build(fakeCtx())
-    mod.dispose?.()
+    const dispose           = vi.fn()
+    const pass              = { enabled: true, dispose } as never
+    const mod               = postProcessing({ effects: () => [ pass ]})
+    const { ctx, cleanups } = testModuleContext({
+      renderer: { getSize: (v: THREE.Vector2) => v.set(800, 600) } as unknown as THREE.WebGLRenderer,
+    })
+
+    mod.build(ctx)
+    expect(cleanups).toHaveLength(1)
+
+    for (const cleanup of cleanups)
+      cleanup()
 
     expect(dispose).toHaveBeenCalledTimes(1)
     expect(handle.bloom.dispose).toHaveBeenCalledTimes(1)
     expect(handle.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('publishes the chain so another module can add a pass', () => {
+    const { ctx, provided } = testModuleContext({
+      renderer: { getSize: (v: THREE.Vector2) => v.set(800, 600) } as unknown as THREE.WebGLRenderer,
+    })
+
+    postProcessing().build(ctx)
+
+    const chain = provided.get(PostChain.name) as PostChainApi
+    expect(chain.size).toEqual({ width: 800, height: 600 })
+
+    const late = { enabled: true } as never
+    chain.addPass(late)
+    expect(handle.addPassBeforeOutput).toHaveBeenCalledWith(late)
   })
 })

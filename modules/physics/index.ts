@@ -17,7 +17,7 @@
 //   physics.add(crate, { mass: 8 })
 
 // the world — an AppModule that owns the fixed step and the body/object sync
-export { physicsWorld, addGroundPlane, addStaticBox } from './world.js'
+export { Physics, descriptor, physicsWorld, addGroundPlane, addStaticBox } from './world.js'
 export type { BodyOptions, BodyShape, PhysicsApi, PhysicsHandle, PhysicsWorldOptions, StepCallback } from './world.js'
 
 // cloth — particles + distance constraints, two-way coupled to the rigid bodies

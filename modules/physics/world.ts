@@ -18,6 +18,8 @@
 import * as CANNON from 'cannon-es'
 import * as THREE from 'three'
 
+import { capability, registerModule } from '../../lib/index.js'
+
 import type { AppModule, SceneContext, Vec3 } from '../../lib/index.js'
 
 
@@ -277,6 +279,13 @@ function writeBodyWorldPose (binding: Binding): void {
 }
 
 /**
+ * The physics world, for any module that needs to drop a body in without being
+ * handed the {@link PhysicsHandle}: `requires: [ Physics ]`, then
+ * `ctx.resolve(Physics)` in `start`.
+ */
+export const Physics = capability<PhysicsApi>('physics')
+
+/**
  * Rigid-body physics for a scene, as a module.
  *
  * @returns A {@link PhysicsHandle}: put it in `use: [ … ]`, then bind objects
@@ -379,13 +388,21 @@ export function physicsWorld<S extends object = Record<string, unknown>> ({
     return body
   }
 
-  return {
-    name:      'physics',
+  const handle: PhysicsHandle<S> = {
+    name:     'physics',
+    provides: [ Physics ],
+
+    // the solver runs before the modules that read body transforms
+    order: -25,
+
     world,
     fixedStep: step,
 
-    build () {
-      // the world needs nothing from the scene — bodies are bound by `add`
+    build (ctx) {
+      // the world needs nothing from the scene — bodies are bound by `add` —
+      // but publishing it as a capability means a module that wants to drop a
+      // body in can resolve it instead of having the handle threaded through
+      ctx.provide(Physics, handle)
     },
 
     update (_state, frame) {
@@ -442,12 +459,39 @@ export function physicsWorld<S extends object = Record<string, unknown>> ({
     dispose () {
       for (const { body } of bindings)
         world.removeBody(body)
+
       bindings.length = 0
       before.clear()
       after.clear()
     },
   }
+
+  return handle
 }
+
+/** Registry entry — see {@link listModules}. */
+export const descriptor = registerModule({
+  id:    'physics',
+  title: 'Fixed-step rigid bodies',
+  summary:
+    'A cannon-es world stepped at a fixed rate with an accumulator, so the same tick sequence ' +
+    'produces the same pile of barrels. Bind three objects to bodies with add(); the module syncs ' +
+    'transforms after every step.',
+  subpath:  'threejs-scene/modules/physics',
+  factory:  'physicsWorld',
+  tags:     [ 'physics', 'simulation' ],
+  cost:     'heavy',
+  peers:    [ 'cannon-es' ],
+  provides: [ Physics ],
+  options:  [
+    { name: 'gravity', type: 'Vec3', summary: 'acceleration in m/s²', default: '[0, -9.82, 0]' },
+    { name: 'step', type: 'number', summary: 'fixed simulation step in seconds; smaller is more stable and more expensive', default: '1/60' },
+    { name: 'maxSubSteps', type: 'number', summary: 'steps a single frame may run before time is dropped — the spiral-of-death guard', default: '4' },
+    { name: 'iterations', type: 'number', summary: 'constraint solver iterations; raise for stacks and cloth', default: '12' },
+    { name: 'allowSleep', type: 'boolean', summary: 'let resting bodies stop simulating', default: 'true' },
+  ],
+  create: (options?: PhysicsWorldOptions) => physicsWorld(options),
+})
 
 /**
  * A static ground plane at `y = height`.
