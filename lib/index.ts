@@ -72,7 +72,7 @@ export type { Store, Reducer, StoreListener } from './state/store.js'
 
 // camera — prebuilt rigs for createApp's `camera` option
 export { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from './camera/index.js'
-export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions } from './camera/index.js'
+export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions, FollowCameraStation } from './camera/index.js'
 
 // render — how it reaches the screen
 export { createRenderer } from './render/renderer.js'

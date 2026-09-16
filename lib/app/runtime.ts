@@ -458,6 +458,10 @@ export function createModuleRuntime<S extends object = Record<string, unknown>, 
       violation (rule, message) {
         flag(entry, rule, message, undefined, false)
       },
+
+      get violations () {
+        return violations
+      },
     }
   }
 

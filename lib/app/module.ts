@@ -17,6 +17,7 @@
 import type * as THREE from 'three'
 
 import type { Capability, CapabilityRef } from './capability.js'
+import type { ModuleViolation } from './strict.js'
 import type { Disposable, FrameContext, SceneContext, Size } from '../types.js'
 
 
@@ -155,6 +156,13 @@ export interface ModuleContext<S extends object = Record<string, unknown>, R = S
 
   /** Report a contract violation against this module. */
   violation (rule: string, message: string): void
+
+  /**
+   * Every contract violation the app has reported so far, oldest first — the
+   * same array `app.violations` exposes. Read it from a diagnostics module or
+   * a HUD; an empty array is the goal.
+   */
+  readonly violations: readonly ModuleViolation[]
 }
 
 /**

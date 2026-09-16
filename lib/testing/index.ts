@@ -193,6 +193,7 @@ export function testModuleContext (overrides: Partial<ModuleContext> = {}): Test
       return (provided.get(token.name) ?? null) as never
     },
     violation () {},
+    violations: [],
     ...overrides,
   }
 
