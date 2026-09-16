@@ -1,0 +1,71 @@
+{
+  "version": "0.6.2",
+  "assets": [
+    {
+      "path": "llm/AGENTS.md",
+      "kind": "instructions",
+      "description": "How to compose this package: the contract, the three properties, the rules, and the recipes. Read this first."
+    },
+    {
+      "path": "llms.txt",
+      "kind": "api",
+      "description": "Every export with its real signature, generated from the built type declarations."
+    },
+    {
+      "path": "llm/RULES.md",
+      "kind": "rules",
+      "description": "The 17 enforced rules with rationale and a wrong/right pair each."
+    },
+    {
+      "path": "llm/rules.json",
+      "kind": "rules",
+      "description": "The same rules as machine-readable JSON."
+    },
+    {
+      "path": "llm/modules.json",
+      "kind": "modules",
+      "description": "The module catalogue: 10 modules with import subpaths, capabilities, options and cost."
+    },
+    {
+      "path": "llm/skills/threejs-scene/SKILL.md",
+      "kind": "skill",
+      "description": "The package as a skill, for hosts that load skills."
+    },
+    {
+      "path": "llm/agents/asset-author.md",
+      "kind": "agent",
+      "name": "threejs-scene-asset-author",
+      "description": "Write procedural geometry, materials, textures and props for threejs-scene's asset layer. Use when asked to \"make a 3D prop\", \"generate geometry procedurally\", \"add a material/texture preset\", \"create props from a text prompt\", \"add to the prop kit\", or when a scene needs content that is not loaded from a file."
+    },
+    {
+      "path": "llm/agents/determinism-auditor.md",
+      "kind": "agent",
+      "name": "threejs-scene-determinism-auditor",
+      "description": "Prove or disprove that a threejs-scene scene or module reproduces the same world from the same seed. Use when asked \"why does this look different every reload\", \"is this deterministic\", \"the snapshot test is flaky\", \"make the replay reproducible\", or when a scene drifts between runs, a headless test disagrees with the browser, or a screenshot diff will not settle."
+    },
+    {
+      "path": "llm/agents/effect-author.md",
+      "kind": "agent",
+      "name": "threejs-scene-effect-author",
+      "description": "Write post-processing passes and GLSL for threejs-scene. Use when asked for bloom, chromatic aberration, CRT/retro looks, god rays, depth of field, motion blur, film grain, outlines, colour grading, a custom ShaderMaterial or ShaderPass, \"add an effect\", \"make it look cinematic\", or when a shader will not compile or link on one device."
+    },
+    {
+      "path": "llm/agents/module-author.md",
+      "kind": "agent",
+      "name": "threejs-scene-module-author",
+      "description": "Write a new AppModule for threejs-scene. Use when asked to \"add a module\", \"make this a module\", \"write a threejs-scene module\", \"add a feature to the scene\" that needs per-frame behaviour, or when a scene needs behaviour no existing module provides. The deepest of the threejs-scene agents."
+    },
+    {
+      "path": "llm/agents/perf-auditor.md",
+      "kind": "agent",
+      "name": "threejs-scene-perf-auditor",
+      "description": "Find and rank the frame-budget problems in a threejs-scene app. Use when asked \"why is this slow\", \"make it run smooth on mobile\", \"reduce draw calls\", \"it drops frames\", \"optimise this scene\", \"the fan spins up\", or when a scene is fine on a desktop and unusable on a phone."
+    },
+    {
+      "path": "llm/agents/scene-builder.md",
+      "kind": "agent",
+      "name": "threejs-scene-builder",
+      "description": "Compose a three.js scene from existing threejs-scene modules. Use when asked to \"build a 3D scene\", \"set up a three.js app\", \"add lighting/orbit/post to the scene\", \"make a landing-page 3D background\", \"wire up createApp\", or when a canvas needs to be mounted with this package. Not for writing a new module — that is threejs-scene-module-author."
+    }
+  ]
+}

@@ -71,15 +71,26 @@ export const LLM_ASSETS: readonly LlmAsset[] = [
 ]
 
 /**
- * Resolve a shipped asset to a URL inside the installed package.
+ * The package export specifier for a shipped asset.
+ *
+ * The markdown and JSON payloads are declared in the package `exports` map, so
+ * node resolves them the same way it resolves the code — which is the only
+ * approach that survives both module systems and a bundler that rewrote the
+ * install layout. Resolve the specifier the way your runtime does, then read
+ * the file.
  *
  * @param path - A path from {@link LLM_ASSETS}, relative to the package root.
- * @returns The resolved URL. Read it with `fs.readFileSync(new URL(...))`.
+ * @returns The specifier, e.g. `'threejs-scene/llm/AGENTS.md'`.
  * @example
- * const text = readFileSync(assetPath('llm/AGENTS.md'), 'utf8')
+ * // ESM
+ * const url  = import.meta.resolve(assetSpecifier('llm/AGENTS.md'))
+ * const text = readFileSync(new URL(url), 'utf8')
+ * @example
+ * // CJS
+ * const text = readFileSync(require.resolve(assetSpecifier('llm/AGENTS.md')), 'utf8')
  */
-export function assetPath (path: string): URL {
-  return new URL(`../../${path}`, import.meta.url)
+export function assetSpecifier (path: string): string {
+  return `threejs-scene/${path}`
 }
 
 /**
