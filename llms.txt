@@ -1,4 +1,4 @@
-# threejs-scene 0.6.2
+# threejs-scene 0.7.0
 
 Deterministic imperative three.js scenes. Vanilla three — **not** react-three-fiber.
 An app shell plus a module contract, a seeded rng, a fixed clock, and an explicit
@@ -15,51 +15,79 @@ import { createApp, defineModule } from 'threejs-scene'
 interface State { speed: number }
 
 const turbine = defineModule<State>({
-  name: 'turbine',
-  build (ctx)                { /* create objects once, add to ctx.scene */ },
-  update (state, frame, ctx) { /* project state onto them, every sim tick */ },
-  resize (size, ctx)         { /* optional */ },
-  render (frame, ctx)        { /* optional — claims the draw */ },
-  dispose ()                 { /* release everything build allocated */ },
+  name:     'turbine',           // unique; also the rng fork label
+  provides: [ TurbineRig ],      // capabilities published with ctx.provide
+  requires: [ Physics ],         // capabilities resolved with ctx.resolve
+  select:   state => state,      // pure projection: what update() reads
+
+  build (ctx)               { /* create ONCE, into ctx.root, through ctx.own */ },
+  start (ctx)               { /* every module has built — resolve peers here */ },
+  update (view, frame, ctx) { /* project the slice onto the scene */ },
+  resize (size, ctx)        { /* optional */ },
+  render (frame, ctx)       { /* optional — claims the draw */ },
+  dispose ()                { /* only what ctx.own could not cover */ },
 })
 
-const app = createApp<State>(canvas, { state: { speed: 1 }, use: [ turbine ] })
+const app = createApp<State>(canvas, { state: { speed: 1 }, loop: { fps: 0 }, use: [ turbine ] })
 
 app.start()                    // attach to the frame loop
-app.setState({ speed: 2 })     // shallow-merge, notifies subscribers
+app.setState({ speed: 2 })     // from OUTSIDE a lifecycle hook only
 app.tick(1 / 60)               // step deterministically instead (headless)
+app.violations                 // contract breaches; empty is the goal
 app.dispose()                  // loop, modules (reverse order), scene, renderer
 ```
 
-State flows **down** (`store → module.update → scene`); input flows **back**
-through `setState`/`dispatch`. Never write app state from inside a scene object.
-Same seed plus same tick sequence reproduces the same world, headless included.
+Modules are **scoped**: `ctx.root` is a Group attached at mount and disposed at teardown,
+`ctx.own(x)` registers anything disposable and returns it, and `ctx.rng` is already forked by
+module id.
 
-`ctx` is a `SceneContext`: `{ scene, camera, renderer, rng, clock }`. The `rng`
-is seeded from `AppOptions.seed`.
+Flow is **unidirectional**: `store -> select -> update -> scene`. A module writes state with
+`ctx.commit(patch)`, which is queued and drained after every module has updated — never mid-tick.
+Only a module declaring a state scope (`defineScopedModule`) may commit.
+
+Order is **deterministic**: a stable topological sort over declared capabilities, tie-broken by the
+`order` band then insertion. Same seed plus same tick sequence reproduces the same world.
+
+`ctx` is a `ModuleContext` — `{ scene, camera, renderer, rng, loop }` plus `root`, `size`,
+`own`, `onCleanup`, `commit`, `dispatch`, `provide`, `resolve`, `tryResolve`, `violations`.
+
+Strict mode (on outside `NODE_ENV=production`) enforces the rules below and reports each with its
+code. Full text: `llm/RULES.md`, or `npx threejs-scene rules`.
 
 ## Rules that stop working code from behaving wrongly
 
-1. **`createApp` owns the only render loop.** Never call
-   `requestAnimationFrame` yourself. Animate in `update`.
-2. **The frame cap is page-global.** `loop.fps` goes to a shared framecapper
+The full catalogue — seventeen rules with rationale and a wrong/right pair each — is
+`llm/RULES.md`, or `npx threejs-scene rules`. The ones that bite first:
+
+1. **`createApp` owns the only render loop** (`SC001`). Never call
+   `requestAnimationFrame` yourself, and never subscribe to `ctx.loop` from a
+   module — in strict mode it refuses. Animate in `update`.
+2. **The frame cap is page-global** (`SC013`). `loop.fps` goes to a shared framecapper
    ([`@tuomashatakka/canvas-loop-framecapper`](https://www.npmjs.com/package/@tuomashatakka/canvas-loop-framecapper)),
    so it applies to every loop on the page. Always pass it explicitly, including
    `0` for uncapped — a scene that omits it inherits whatever the last one asked
    for.
 3. **The loop starts paused.** Call `start()`, or `tick()` per frame yourself.
 4. **Generation in `build`, animation in `update`, viewport in `resize`,
-   teardown in `dispose`.** Everything a module puts on the GPU it releases.
-5. **Only one `render` hook wins.** Last-mounted module takes it; a top-level
-   `AppOptions.render` overrides all of them. Prefer the module.
-6. **`modules/assets` is DOM-free and SSR-safe** — textures are `DataTexture`,
+   teardown in `dispose`** (`SC012`). Build into `ctx.root` (`SC004`) and route every
+   GPU allocation through `ctx.own` (`SC005`) — then teardown is automatic and exact.
+5. **Only one `render` hook wins** (`SC011`). The last module in resolved order takes it;
+   a top-level `AppOptions.render` overrides all of them. Prefer the module.
+6. **`modules/assets` is DOM-free and SSR-safe** (`SC014`) — textures are `DataTexture`,
    never canvas. Keep it that way; it is what makes headless tests work.
-7. **Determinism is a feature.** Use `createSeededRng` and fork it by name
-   (`rng.fork('trees')`) so adding one consumer does not reshuffle every consumer
-   after it. Never `Math.random`. Never `Date.now` for animation — take time
-   from `frame`.
-8. **`disposeScene` and `disposeMaterial` dispose indiscriminately.** If you
-   pool materials, mark them with `markShared` and tear down per module instead.
+7. **Determinism is a feature** (`SC002`, `SC003`). `ctx.rng` is already forked by module
+   id; fork it again per feature (`rng.fork('trees')`) so adding one consumer does not
+   reshuffle every consumer after it. Never `Math.random`. Never `Date.now` for animation —
+   take time from `frame`.
+8. **Never write app state from inside a lifecycle hook** (`SC006`). `ctx.commit(patch)`
+   queues the write and the runtime drains it at the tick boundary, so every module in a tick
+   sees the same world. Only a module with a declared state scope may commit (`SC007`).
+9. **`disposeScene` and `disposeMaterial` dispose indiscriminately** (`SC015`). If you
+   pool materials, mark them `userData.shared = true` and tear down per module instead.
+
+Check your own work with `auditModule()` from `threejs-scene/testing`: it runs a module
+through two full lifecycles and reports violations, leaks, stranded children, and any difference
+between the two runs from the same seed.
 
 ## Choosing an import path
 
@@ -133,34 +161,56 @@ last committed state handed back by the release function on teardown.
 the app shell: loop, store, camera, renderer, input, disposal, diagnostics
 
 
-**functions** (40)
+**functions** (71)
 
 ```ts
 aimIsoCamera(camera: THREE.OrthographicCamera, aim?: IsoAimOptions): void
+assetSpecifier(path: string): string
 attachPointerGesture(el: HTMLElement, callbacks: PointerGestureCallbacks, options?: PointerGestureOptions): () => void
 attachResizeObserver(renderer: THREE.WebGLRenderer, camera: THREE.Camera, canvas: HTMLCanvasElement, onResize?: ResizeHandler): () => void
+auditModule(factory: AnyAppModule | (() => AnyAppModule), options?: HeadlessOptions & { ticks?: number
 auditPrograms(renderer: WebGLRenderer): ProgramFault[]
+capability<T>(name: string): Capability<T>
+capabilityMap(): Record<string, string[]>
+capabilityName(ref: CapabilityRef): string
 censusProgram(gl: WebGL2RenderingContext, program: WebGLProgram, name: string): ProgramCensus
 censusPrograms(renderer: WebGLRenderer): ProgramCensus[]
+consoleReporter(violation: ModuleViolation): void
 createApp<S extends object = Record<string, unknown>, A = Partial<S>>(canvas: HTMLCanvasElement, options?: AppOptions<S, A>): App<S, A>
 createClock(options?: ClockOptions): Clock
 createFollowCamera(options?: FollowCameraOptions): FollowCamera
 createFrameLoop(options?: FrameLoopOptions): FrameLoop
 createIsoCamera(aspect: number, options?: IsoCameraOptions): THREE.OrthographicCamera
 createLadderMemory<T extends string>(options: LadderMemoryOptions<T>): LadderMemory<T>
+createModuleRuntime<S extends object = Record<string, unknown>, A = Partial<S>>(options: ModuleRuntimeOptions<S, A>): ModuleRuntime<S, A>
+createNondeterminismTrap(): NondeterminismTrap
+createRegisteredModule<S extends object = Record<string, unknown>>(id: string, options?: unknown): AnyAppModule<S>
 createRenderer(options: RendererOptions): THREE.WebGLRenderer
 createSeededRng(seed: number): SeededRng
 createStateAccess<S extends object>(authored: S): StateAccess<S>
 createStore<S extends object, A = Partial<S>>(initial: S, reducer?: Reducer<S, A>): Store<S, A>
-defineModule<S extends object = Record<string, unknown>>(module: AppModule<S>): AppModule<S>
+deepFreeze<T>(value: T): T
+defineModule<S extends object = Record<string, unknown>, R = S>(module: AppModule<S, R>): AppModule<S, R>
+definePlugin<S extends object = Record<string, unknown>>(plugin: Plugin<S>): Plugin<S>
+defineScopedModule<S extends object, K extends keyof S & string>(at: K, initial: S[K], module: Omit<AppModule<S, S[K]>, 'scope'>): AppModule<S, S[K]>
 describeCensus(census: ProgramCensus, rowLimit: number): string
+describeModules(): string
 describeQualitySignals(signals: QualitySignals): string
+describeRules(options?: { all?: boolean
 disposeMaterial(mat: THREE.Material): void
 disposeMesh(mesh: THREE.Mesh, options?: DisposeMeshOptions): void
 disposeScene(root: THREE.Object3D): void
+findModuleDescriptor(id: string): ModuleDescriptor<never> | undefined
+findRule(key: string): Rule | undefined
+flattenPlugins<S extends object>(plugins: readonly PluginInput<S>[] | undefined): AnyAppModule<S>[]
 hash2(x: number, y: number): number
 hash3(x: number, y: number, z: number): number
+headlessApp(options?: HeadlessOptions): App<Record<string, unknown>>
+instructions(): string
+isCapability(value: unknown): value is Capability<unknown>
 lerp(a: number, b: number, t: number): number
+listModules(): readonly ModuleDescriptor<never>[]
+moduleCatalog(): ModuleCatalogReturnType
 mulberry32(seed: number): () => number
 openStorage(probe: string): Storage | null
 packedRows(varyings: VaryingCount[]): number
@@ -169,29 +219,53 @@ readPath(root: object, path: string): unknown
 readQualitySignals(options?: QualitySignalOptions): QualitySignals
 readTextPath(root: object, path: string, fallback?: string): string
 readVaryings(source: string): VaryingCount[]
+registerModule<O>(descriptor: ModuleDescriptor<O>): ModuleDescriptor<O>
 reportPrograms(renderer: WebGLRenderer, report: AuditReport, auditOnly: boolean): boolean
 resizeIsoCamera(camera: THREE.OrthographicCamera, aspect: number): void
+resolveOrder<S extends object>(list: readonly MountedModule<S>[], onCycle?: (stuck: MountedModule<S>) => void): MountedModule<S>[]
+resolveStrict(options: StrictOptions | boolean | undefined): StrictConfig
+ruleMessage(key: string, detail: string): string
 smoothstep(edge0: number, edge1: number, value: number): number
+snapshotObject(root: THREE.Object3D, precision?: number): string
+stubCanvas(options?: Partial<Size>): HTMLCanvasElement
+stubRenderer(overrides?: Partial<THREE.WebGLRenderer>): THREE.WebGLRenderer
+testModuleContext(overrides?: Partial<ModuleContext>): TestModuleContext
 valueNoise1d(at: number, span: number, phase?: number): number
 varyingRowLimit(gl: WebGL2RenderingContext): number
+violationOf(key: string, module: string, phase: ModuleViolation['phase'], detail: string, at?: string): ModuleViolation
 withPath<S extends object>(state: S, path: string, value: unknown): S
 writePath(root: object, path: string, value: unknown): void
 ```
 
-**types** (42): `App`, `AppCameraOptions`, `AppLoopOptions`, `AppModule`, `AppOptions`, `AppSceneOptions`, `AuditReport`, `Clock`, `ClockMode`, `ClockOptions`, `Disposable`, `DisposeMeshOptions`, `FollowCamera`, `FollowCameraOptions`, `FollowCameraStation`, `FrameCallback`, `FrameContext`, `FrameLoop`, `FrameLoopOptions`, `IsoAimOptions`, `IsoCameraOptions`, `LadderMemory`, `LadderMemoryOptions`, `ModuleHandle`, `PointerGestureCallbacks`, `PointerGestureOptions`, `ProgramCensus`, `ProgramFault`, `QualitySignalOptions`, `QualitySignals`, `Reducer`, `RendererOptions`, `ResizeHandler`, `SceneContext`, `SeededRng`, `Size`, `StateAccess`, `StateValue`, `Store`, `StoreListener`, `VaryingCount`, `Vec3`
+**values** (9)
+
+```ts
+AssetCatalog: import("./capability.js").Capability<AssetCatalogApi>
+CameraRig: import("./capability.js").Capability<CameraRigApi>
+catalog: typeof moduleCatalog
+LLM_ASSETS: readonly LlmAsset[]
+Persistence: import("./capability.js").Capability<PersistenceApi>
+PointerInput: import("./capability.js").Capability<PointerInputApi>
+PostChain: import("./capability.js").Capability<PostChainApi>
+Quality: import("./capability.js").Capability<QualityApi>
+RULES: readonly Rule[]
+```
+
+**types** (79): `AnyAppModule`, `AnyCapability`, `App`, `AppCameraOptions`, `AppLoopOptions`, `AppModule`, `AppOptions`, `AppSceneOptions`, `AssetCatalogApi`, `AuditReport`, `CameraRigApi`, `Capability`, `CapabilityRef`, `CapabilityValue`, `Clock`, `ClockMode`, `ClockOptions`, `Disposable`, `DisposeMeshOptions`, `FollowCamera`, `FollowCameraOptions`, `FollowCameraStation`, `FrameCallback`, `FrameContext`, `FrameLoop`, `FrameLoopOptions`, `HeadlessOptions`, `IsoAimOptions`, `IsoCameraOptions`, `LadderMemory`, `LadderMemoryOptions`, `LeakedResource`, `LlmAsset`, `ModuleAudit`, `ModuleContext`, `ModuleDescriptor`, `ModuleHandle`, `ModuleOption`, `ModulePatch`, `ModuleRuntime`, `ModuleRuntimeOptions`, `ModuleStateScope`, `ModuleViolation`, `MountedModule`, `NondeterminismTrap`, `OwnedResource`, `PersistenceApi`, `Plugin`, `PluginInput`, `PointerGestureCallbacks`, `PointerGestureOptions`, `PointerInputApi`, `PointerState`, `PostChainApi`, `ProgramCensus`, `ProgramFault`, `QualityApi`, `QualitySignalOptions`, `QualitySignals`, `QualityTier`, `Reducer`, `RendererOptions`, `ResizeHandler`, `Rule`, `RuleCode`, `SceneContext`, `SeededRng`, `Size`, `StateAccess`, `StateScope`, `StateValue`, `Store`, `StoreListener`, `StrictConfig`, `StrictOptions`, `TestModuleContext`, `VaryingCount`, `Vec3`, `ViolationReporter`
 
 ### `threejs-scene/modules/assets`
 
 procedural geometry, materials, textures, props. DOM-free and deterministic
 
 
-**functions** (90)
+**functions** (91)
 
 ```ts
 applyBend(geo: THREE.BufferGeometry, angle: number, axis?: Axis): THREE.BufferGeometry
 applyGrime(geometry: THREE.BufferGeometry, options: GrimeOptions): THREE.BufferGeometry
 applyTaper(geo: THREE.BufferGeometry, factor: number, axis?: Axis): THREE.BufferGeometry
 applyTwist(geo: THREE.BufferGeometry, angle: number, axis?: Axis): THREE.BufferGeometry
+assetCatalog<S extends object = Record<string, unknown>>(options?: AssetCatalogOptions): AppModule<S>
 auditPalette(geometry: THREE.BufferGeometry, palette: Readonly<Record<string, string>>): PaletteAuditEntry[]
 bakeAlphaField(size: number, sampler: (field: Uint8Array) => void, options?: AlphaFieldOptions): THREE.DataTexture
 bakeFacetColors(geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation, options?: FacetColorOptions): THREE.BufferGeometry
@@ -280,7 +354,7 @@ tryCreateProp(input: unknown, options?: Readonly<Record<string, unknown>>): Crea
 validatePropSpec(input: unknown): SpecReview
 ```
 
-**values** (27)
+**values** (28)
 
 ```ts
 ASCII_SHADES= " .:-~=+*#%@"
@@ -293,6 +367,7 @@ cone: (radius: number, height: number, sides?: number) => THREE.BufferGeometry
 CREATE_PROP_SCHEMA: JsonSchema
 cyl: (top: number, bottom: number, height: number, sides?: number) => THREE.BufferGeometry
 deg: (value: number) => number
+descriptor: import("../../lib/index.js").ModuleDescriptor<AssetCatalogOptions>
 FLAT_SHAPES: readonly ShapeName[]
 hedron: (radius: number, detail?: number) => THREE.BufferGeometry
 KIT_PALETTE: { readonly concrete: "#8d8579"
@@ -318,7 +393,7 @@ TEXTURE_PRESET_NAMES: readonly ["grid", "noise", "gradient", "seamless-noise", "
 Propextends THREE.Group implements Disposable { #private
 ```
 
-**types** (102): `AlphaFieldOptions`, `AsciiRasterOptions`, `AsciiRasterResult`, `AsciiView`, `AsciiViewName`, `AssetManifestEntry`, `AssetMaterialPresetName`, `Axis`, `AxisName`, `BoatOptions`, `BuildAttempt`, `BuildPropOptions`, `Claim`, `CloudOptions`, `CompositePart`, `ConnectionGraph`, `ConnectionGraphOptions`, `CreatePropAttempt`, `CreatePropInput`, `CreatePropToolOptions`, `CrystalOptions`, `ExtrudeAlongPathOptions`, `ExtrudeOptions`, `FacetColorOptions`, `GeneratePropOptions`, `GradientTextureOptions`, `GridLayout`, `GridTextureOptions`, `GrimeOptions`, `HolographicMaterialOptions`, `InfiniteGround`, `InfiniteGroundOptions`, `InstancePlace`, `InstancePlacement`, `InstancedPropOptions`, `InstancedPropResult`, `IssueLevel`, `JsonSchema`, `KitOptions`, `KitPaletteKey`, `KitPropName`, `LampPostOptions`, `LatheOptions`, `MatcapTextureOptions`, `MaterialPreset`, `MaterialPresetParams`, `MergePartsOptions`, `NoiseDisplaceOptions`, `NoiseTextureOptions`, `NormalizedPart`, `NormalizedPropSpec`, `NormalizedRepeat`, `PaletteAuditEntry`, `ParamSpec`, `ParamSpecMap`, `ParamValue`, `PartOptions`, `PartSpec`, `PathTubeOptions`, `Placement`, `PlacementField`, `PlacementFieldOptions`, `PlacementQuery`, `ProceduralTextureOptions`, `PromptOptions`, `PropCompletion`, `PropCompletionRequest`, `PropComposite`, `PropDefinition`, `PropExample`, `PropGeneration`, `PropOptions`, `PropPresetRequest`, `PropRegistry`, `PropReview`, `PropSpec`, `PropTool`, `PropToolResult`, `RadialLayout`, `RepeatMode`, `RepeatSpec`, `ResolvedPropOptions`, `RibbonPoint`, `RibbonSection`, `RibbonVertex`, `RockGeometryOptions`, `RockOptions`, `ScatterOptions`, `ScatterResult`, `SeamlessNoiseTextureOptions`, `ShapeName`, `SpecIssue`, `SpecReview`, `SpecVec3`, `SurfaceRibbonOptions`, `TexturePresetName`, `TickableMaterial`, `ToonMaterialOptions`, `Transform`, `TransportFrames`, `TreeOptions`, `TriplanarMaterialOptions`
+**types** (103): `AlphaFieldOptions`, `AsciiRasterOptions`, `AsciiRasterResult`, `AsciiView`, `AsciiViewName`, `AssetCatalogOptions`, `AssetManifestEntry`, `AssetMaterialPresetName`, `Axis`, `AxisName`, `BoatOptions`, `BuildAttempt`, `BuildPropOptions`, `Claim`, `CloudOptions`, `CompositePart`, `ConnectionGraph`, `ConnectionGraphOptions`, `CreatePropAttempt`, `CreatePropInput`, `CreatePropToolOptions`, `CrystalOptions`, `ExtrudeAlongPathOptions`, `ExtrudeOptions`, `FacetColorOptions`, `GeneratePropOptions`, `GradientTextureOptions`, `GridLayout`, `GridTextureOptions`, `GrimeOptions`, `HolographicMaterialOptions`, `InfiniteGround`, `InfiniteGroundOptions`, `InstancePlace`, `InstancePlacement`, `InstancedPropOptions`, `InstancedPropResult`, `IssueLevel`, `JsonSchema`, `KitOptions`, `KitPaletteKey`, `KitPropName`, `LampPostOptions`, `LatheOptions`, `MatcapTextureOptions`, `MaterialPreset`, `MaterialPresetParams`, `MergePartsOptions`, `NoiseDisplaceOptions`, `NoiseTextureOptions`, `NormalizedPart`, `NormalizedPropSpec`, `NormalizedRepeat`, `PaletteAuditEntry`, `ParamSpec`, `ParamSpecMap`, `ParamValue`, `PartOptions`, `PartSpec`, `PathTubeOptions`, `Placement`, `PlacementField`, `PlacementFieldOptions`, `PlacementQuery`, `ProceduralTextureOptions`, `PromptOptions`, `PropCompletion`, `PropCompletionRequest`, `PropComposite`, `PropDefinition`, `PropExample`, `PropGeneration`, `PropOptions`, `PropPresetRequest`, `PropRegistry`, `PropReview`, `PropSpec`, `PropTool`, `PropToolResult`, `RadialLayout`, `RepeatMode`, `RepeatSpec`, `ResolvedPropOptions`, `RibbonPoint`, `RibbonSection`, `RibbonVertex`, `RockGeometryOptions`, `RockOptions`, `ScatterOptions`, `ScatterResult`, `SeamlessNoiseTextureOptions`, `ShapeName`, `SpecIssue`, `SpecReview`, `SpecVec3`, `SurfaceRibbonOptions`, `TexturePresetName`, `TickableMaterial`, `ToonMaterialOptions`, `Transform`, `TransportFrames`, `TreeOptions`, `TriplanarMaterialOptions`
 
 ### `threejs-scene/modules/post`
 
@@ -366,10 +441,11 @@ crtCorrectPointer(ndcX: number, ndcY: number, curvature: number): CrtCorrectPoin
 postProcessing<S extends object = Record<string, unknown>>(options?: PostProcessingOptions): AppModule<S>
 ```
 
-**values** (7)
+**values** (8)
 
 ```ts
 BLOOM_LAYER= 1
+descriptor: import("../../lib/index.js").ModuleDescriptor<PostProcessingOptions>
 FULLSCREEN_VERTEX= "\n varying vec2 vUv;\n void main () {\n vUv = uv;\n gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n }\n"
 GLSL_CHROMATIC= "\n vec3 chromaticSample (sampler2D tex, vec2 uv, vec2 off) {\n return vec3(\n texture2D(tex, uv + off).r,\n texture2D(tex, uv).g,\n texture2D(tex, uv - off).b\n );\n }\n"
 GLSL_GRAIN= "\n float grain (vec2 uv, float t, float intensity) {\n return (fract(sin(dot(uv * 1024.0 + t, vec2(127.1, 311.7))) * 43758.5453) - 0.5) * intensity;\n }\n"
@@ -446,7 +522,14 @@ standard light rigs
 standardLighting<S extends object = Record<string, unknown>>(options?: LightingOptions): AppModule<S>
 ```
 
-**types** (4): `LightingEnvOptions`, `LightingHemiOptions`, `LightingOptions`, `LightingSunOptions`
+**values** (2)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<LightingOptions>
+LightingRig: import("../../lib/index.js").Capability<LightingRigApi>
+```
+
+**types** (5): `LightingEnvOptions`, `LightingHemiOptions`, `LightingOptions`, `LightingRigApi`, `LightingSunOptions`
 
 ### `threejs-scene/modules/orbit`
 
@@ -459,7 +542,14 @@ orbit controls as a module
 orbitControls<S extends object = Record<string, unknown>>(options?: OrbitOptions): AppModule<S>
 ```
 
-**types** (1): `OrbitOptions`
+**values** (2)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<OrbitOptions>
+Orbit: import("../../lib/index.js").Capability<OrbitApi>
+```
+
+**types** (2): `OrbitApi`, `OrbitOptions`
 
 ### `threejs-scene/modules/physics`
 
@@ -476,9 +566,156 @@ createLiquid(physics: PhysicsApi, options?: LiquidOptions): Liquid
 physicsWorld<S extends object = Record<string, unknown>>(options?: PhysicsWorldOptions): PhysicsHandle<S>
 ```
 
+**values** (2)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<PhysicsWorldOptions>
+Physics: import("../../lib/index.js").Capability<PhysicsApi>
+```
+
 **types** (13): `BodyOptions`, `BodyShape`, `Cloth`, `ClothOptions`, `ClothPinning`, `Liquid`, `LiquidOptions`, `LiquidRenderMode`, `LiquidSolver`, `PhysicsApi`, `PhysicsHandle`, `PhysicsWorldOptions`, `StepCallback`
+
+### `threejs-scene/modules/camera`
+
+the camera as a module: iso, follow, or perspective, publishing the camera-rig capability
+
+
+**functions** (1)
+
+```ts
+cameraRig<S extends object = Record<string, unknown>>(options?: CameraRigOptions): AppModule<S>
+```
+
+**values** (1)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<CameraRigOptions>
+```
+
+**types** (4): `CameraRigFollowApi`, `CameraRigModuleApi`, `CameraRigOptions`, `FollowTarget`
+
+### `threejs-scene/modules/input`
+
+pointer, wheel and pinch sampled into the tick, with a camera-aware raycast
+
+
+**functions** (1)
+
+```ts
+pointerInput<S extends object = Record<string, unknown>>(options?: PointerInputOptions): AppModule<S>
+```
+
+**values** (1)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<PointerInputOptions>
+```
+
+**types** (2): `PointerInputOptions`, `PointerStateSlice`
+
+### `threejs-scene/modules/quality`
+
+the device-quality ladder: pick a tier, measure, step down, remember
+
+
+**functions** (1)
+
+```ts
+qualityGovernor<S extends object = Record<string, unknown>>(options?: QualityGovernorOptions): AppModule<S>
+```
+
+**values** (2)
+
+```ts
+DEFAULT_TIERS: readonly QualityTier[]
+descriptor: import("../../lib/index.js").ModuleDescriptor<QualityGovernorOptions>
+```
+
+**types** (2): `QualityGovernorOptions`, `QualitySlice`
+
+### `threejs-scene/modules/diagnostics`
+
+shader link audit at start, renderer.info sampling while running
+
+
+**functions** (1)
+
+```ts
+diagnostics<S extends object = Record<string, unknown>>(options?: DiagnosticsOptions): AppModule<S>
+```
+
+**values** (2)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<DiagnosticsOptions>
+Diagnostics: import("../../lib/index.js").Capability<DiagnosticsApi>
+```
+
+**types** (3): `DiagnosticsApi`, `DiagnosticsOptions`, `DiagnosticsSample`
+
+### `threejs-scene/modules/persistence`
+
+one state key restored from storage as a queued commit, written back on a timer
+
+
+**functions** (1)
+
+```ts
+persistence<S extends object = Record<string, unknown>, T extends object = Record<string, unknown>>(options: PersistenceOptions<T>): AppModule<S>
+```
+
+**values** (1)
+
+```ts
+descriptor: import("../../lib/index.js").ModuleDescriptor<PersistenceOptions<Record<string, unknown>>>
+```
+
+**types** (1): `PersistenceOptions`
+
+### `threejs-scene/testing`
+
+the contract test kit: auditModule, headlessApp, testModuleContext, snapshotObject
+
+
+**functions** (6)
+
+```ts
+auditModule(factory: AnyAppModule | (() => AnyAppModule), options?: HeadlessOptions & { ticks?: number
+headlessApp(options?: HeadlessOptions): App<Record<string, unknown>>
+snapshotObject(root: THREE.Object3D, precision?: number): string
+stubCanvas(options?: Partial<Size>): HTMLCanvasElement
+stubRenderer(overrides?: Partial<THREE.WebGLRenderer>): THREE.WebGLRenderer
+testModuleContext(overrides?: Partial<ModuleContext>): TestModuleContext
+```
+
+**types** (4): `HeadlessOptions`, `LeakedResource`, `ModuleAudit`, `TestModuleContext`
+
+### `threejs-scene/llm`
+
+the rules and the module catalogue as data, for a host composing a prompt
+
+
+**functions** (5)
+
+```ts
+assetSpecifier(path: string): string
+describeRules(options?: { all?: boolean
+findRule(key: string): Rule | undefined
+instructions(): string
+ruleMessage(key: string, detail: string): string
+```
+
+**values** (3)
+
+```ts
+catalog: typeof moduleCatalog
+LLM_ASSETS: readonly LlmAsset[]
+RULES: readonly Rule[]
+```
+
+**types** (3): `LlmAsset`, `Rule`, `RuleCode`
 
 ---
 
-Generated by `scripts/gen-llms.ts` from `dist/**/*.d.ts` at version 0.6.2.
+Generated by `scripts/gen-llms.ts` from `dist/**/*.d.ts` at version 0.7.0.
 Regenerate after changing any public signature: `bun scripts/gen-llms.ts`.

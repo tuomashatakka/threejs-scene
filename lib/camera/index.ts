@@ -6,4 +6,4 @@ export { createIsoCamera, resizeIsoCamera, aimIsoCamera } from './iso.js'
 export { createFollowCamera } from './follow.js'
 
 export type { IsoCameraOptions, IsoAimOptions } from './iso.js'
-export type { FollowCamera, FollowCameraOptions } from './follow.js'
+export type { FollowCamera, FollowCameraOptions, FollowCameraStation } from './follow.js'

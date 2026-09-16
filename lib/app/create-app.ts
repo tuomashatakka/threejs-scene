@@ -16,13 +16,20 @@ import { createSeededRng } from '../state/rng.js'
 import { createRenderer } from '../render/renderer.js'
 import { attachResizeObserver } from '../render/resize.js'
 import { disposeScene } from '../lifecycle/dispose.js'
+import { createModuleRuntime } from './runtime.js'
+import { flattenPlugins } from './plugin.js'
+import { resolveStrict, violationOf } from './strict.js'
 
 import type { Clock, ClockOptions } from '../time/clock.js'
 import type { Store, Reducer } from '../state/store.js'
 import type { RendererOptions } from '../render/renderer.js'
 import type { ResizeHandler } from '../render/resize.js'
-import type { AppModule, ModuleHandle } from './module.js'
-import type { Disposable, FrameContext, SceneContext, Vec3 } from '../types.js'
+import type { AnyAppModule, AppModule, ModuleHandle } from './module.js'
+import type { Capability } from './capability.js'
+import type { PluginInput } from './plugin.js'
+import type { ModuleRuntime } from './runtime.js'
+import type { ModuleViolation, StrictOptions } from './strict.js'
+import type { Disposable, FrameContext, SceneContext, Size, Vec3 } from '../types.js'
 
 
 /**
@@ -102,7 +109,27 @@ export interface AppOptions<S extends object, A = Partial<S>> {
   onResize?: ResizeHandler
 
   /** Modules built at creation, in order — same contract as `app.use()`. */
-  use?: AppModule<S>[]
+  use?: AnyAppModule<S>[]
+
+  /**
+   * Plugin bundles, flattened ahead of `use`. A plugin is a named group of
+   * modules that only make sense together; see {@link definePlugin}.
+   */
+  plugins?: readonly PluginInput<S>[]
+
+  /**
+   * Contract enforcement. On by default unless `NODE_ENV` is `'production'`:
+   * modules are watched for nondeterminism, out-of-scope scene writes, state
+   * mutation, per-tick allocation, and undeclared capability use. Pass `false`
+   * to switch it off, or an object to tune it; see {@link StrictOptions}.
+   */
+  strict?: StrictOptions | boolean
+
+  /**
+   * Receives every contract violation instead of the default console reporter.
+   * Shorthand for `strict: { report }`.
+   */
+  onViolation?: (violation: ModuleViolation) => void
 }
 
 /**
@@ -122,7 +149,25 @@ export interface App<S extends object, A = Partial<S>> extends Disposable {
   dispatch (action: A): void
 
   /** Build `module` immediately and add it to the update loop. */
-  use (module: AppModule<S>): ModuleHandle
+  use<R> (module: AppModule<S, R>): ModuleHandle
+
+  /** Build every module of a plugin bundle, in order. */
+  usePlugin (plugin: PluginInput<S>): ModuleHandle[]
+
+  /** Read a capability published by a mounted module. Throws when absent. */
+  resolve<T> (token: Capability<T>): T
+
+  /** Read a capability published by a mounted module, or `null`. */
+  tryResolve<T> (token: Capability<T>): T | null
+
+  /** Mounted module ids in resolved order — providers before consumers. */
+  readonly modules: readonly string[]
+
+  /** Every contract violation reported so far. Empty is the goal. */
+  readonly violations: readonly ModuleViolation[]
+
+  /** The module graph and lifecycle pump, for editors and test harnesses. */
+  readonly runtime: ModuleRuntime<S, A>
 
   /** Advance the simulation by `realDelta` seconds (default 1/60) and render once. */
   tick (realDelta?: number): void
@@ -218,47 +263,41 @@ export function createApp<S extends object = Record<string, unknown>, A = Partia
   const rng    = createSeededRng(seed)
   const loop   = createFrameLoop({ fps: options.loop?.fps })
 
+  const strict = resolveStrict(
+    options.onViolation
+      ? { ...typeof options.strict === 'boolean' ? { enabled: options.strict } : options.strict, report: options.onViolation }
+      : options.strict,
+  )
+
+  // the app-level context. Modules receive a ModuleContext — a superset of this
+  // scoped to one module — never this object; `loop` in particular is the app's
+  // to drive, which is why a module's copy of it refuses subscribers (SC001).
   const ctx: SceneContext = { scene, camera, renderer, rng, loop }
 
-  // modules — built immediately, updated in insertion order
-  const active: AppModule<S>[] = []
+  let size: Size = { width: canvas.clientWidth || 1, height: canvas.clientHeight || 1 }
 
-  // the module that owns the frame draw (last-mounted one defining `render`).
-  // Recomputed on every mount/remove so pump() stays a cheap lookup.
-  let renderModule: AppModule<S> | undefined
-
-  function recomputeRenderModule (): void {
-    renderModule = undefined
-    for (const module of active)
-      if (module.render)
-        renderModule = module
-  }
-
-  function mountModule (module: AppModule<S>): ModuleHandle {
-    module.build(ctx)
-    active.push(module)
-    recomputeRenderModule()
-    return {
-      name: module.name,
-      remove () {
-        const index = active.indexOf(module)
-        if (index >= 0)
-          active.splice(index, 1)
-        recomputeRenderModule()
-        module.dispose?.()
-      },
-    }
-  }
+  const runtime = createModuleRuntime<S, A>({
+    scene,
+    camera,
+    renderer,
+    rng,
+    loop,
+    store,
+    strict,
+    size: () => size,
+  })
 
   const detachResize = attachResizeObserver(renderer, camera, canvas, (width, height) => {
-    const size = { width, height }
-    for (const module of active)
-      module.resize?.(size, ctx)
+    size = { width, height }
+    runtime.resize(size)
     onResize?.(width, height)
   })
 
-  for (const module of initialModules)
-    mountModule(module)
+  for (const module of [ ...flattenPlugins(options.plugins), ...initialModules ])
+    runtime.mount(module)
+
+  // every module has built — capabilities are resolvable from here on
+  runtime.start()
 
   // pre-warm shaders so the first frame doesn't stall
   renderer.compile(scene, camera)
@@ -266,55 +305,116 @@ export function createApp<S extends object = Record<string, unknown>, A = Partia
   // one simulation tick: state -> modules. Never the reverse.
   let frame = 0
 
-  function step (delta: number): void {
+  function step (delta: number, elapsed: number): void {
     frame += 1
-
-    const frameCtx: FrameContext = { delta, elapsed: clock.elapsed(), frame }
-    const current                = store.get()
-    for (const module of active)
-      module.update?.(current, frameCtx, ctx)
+    runtime.update({ delta, elapsed, frame })
   }
 
   // one pump per real frame: 0..n sim ticks, then exactly one render.
-  // Draw path priority: the AppOptions.render override, else a module's
-  // render hook (post-processing composer), else the plain scene render.
+  // Draw path priority: the AppOptions.render override, else the claiming
+  // module's render hook (post-processing composer), else the plain scene render.
   function pump (realDelta: number): void {
-    for (const delta of clock.advance(realDelta))
-      step(delta)
+    const deltas = clock.advance(realDelta)
+
+    // `advance` has already banked every step it is about to hand back, so
+    // clock.elapsed() is end-of-pump time. Reading it per sub-step would give
+    // all three ticks of one pump the same `elapsed` — a module animating from
+    // it would jump 3 × step and then stand still, which is deterministic and
+    // wrong. Walk forward from where the pump started instead.
+    let elapsed = clock.elapsed()
+
+    for (const delta of deltas)
+      elapsed -= delta
+
+    for (const delta of deltas) {
+      elapsed += delta
+      step(delta, elapsed)
+    }
 
     const frameCtx: FrameContext = { delta: realDelta, elapsed: clock.elapsed(), frame }
+
     if (render)
       render(frameCtx)
-    else if (renderModule)
-      renderModule.render!(frameCtx, ctx)
-    else
+    else if (!runtime.render(frameCtx))
       renderer.render(scene, camera)
   }
 
   const stopFrame = loop.onFrame(({ delta }) => pump(delta))
 
+  /**
+   * The only way app state changes. A write from inside a lifecycle hook is a
+   * unidirectional-flow break (SC006) — it would let one module see a world the
+   * module beside it never saw — so it is reported and dropped rather than
+   * silently applied halfway through a tick.
+   */
+  function guardWrite (what: string): boolean {
+    if (!runtime.inLifecycle)
+      return true
+
+    runtime.report(violationOf(
+      'SC006',
+      'app',
+      runtime.phase ?? 'app',
+      `${what} was called from inside a lifecycle hook; use ctx.commit so the write lands at the tick boundary`,
+    ))
+    return false
+  }
+
+  let disposed = false
+
   return {
     ctx,
     store,
     getState: store.get,
-    setState: patch => store.set(patch),
-    dispatch: action => store.dispatch(action),
-    use:      mountModule,
+
+    setState (patch) {
+      if (guardWrite('setState'))
+        store.set(patch)
+    },
+
+    dispatch (action) {
+      if (guardWrite('dispatch'))
+        store.dispatch(action)
+    },
+
+    use: module => runtime.mount(module),
+
+    usePlugin (plugin) {
+      return flattenPlugins([ plugin ]).map(module => runtime.mount(module))
+    },
+
+    resolve:    token => runtime.resolve(token),
+    tryResolve: token => runtime.tryResolve(token),
+
+    get modules () {
+      return runtime.order.map(entry => entry.id)
+    },
+    get violations () {
+      return runtime.violations
+    },
+    runtime,
+
     tick (realDelta = 1 / 60) {
       pump(realDelta)
     },
+
     start: () => loop.start(),
     stop:  () => loop.stop(),
+
     get running () {
       return loop.running
     },
+
     dispose () {
+      if (disposed)
+        return
+
+      disposed = true
       stopFrame()
       loop.dispose()
       detachResize()
-      for (const module of [ ...active ].reverse())
-        module.dispose?.()
-      active.length = 0
+      runtime.stop()
+      runtime.dispose()
       disposeScene(scene)
       renderer.dispose()
     },

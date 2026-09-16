@@ -1,0 +1,488 @@
+{
+  "generatedFrom": "the module registry, populated by importing every module subpath",
+  "version": "0.7.0",
+  "modules": [
+    {
+      "id": "assets",
+      "title": "Asset catalogue",
+      "summary": "Named procedural props, built through one owner so teardown happens exactly once, and seeded from one fork-per-id stream so the same id yields the same geometry on every run. DOM-free and SSR-safe.",
+      "subpath": "threejs-scene/modules/assets",
+      "factory": "assetCatalog",
+      "tags": [
+        "assets",
+        "content"
+      ],
+      "cost": "cheap",
+      "peers": [],
+      "provides": [
+        "asset-catalog"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "definitions",
+          "type": "PropDefinition[]",
+          "summary": "extra prop definitions on top of the built-in presets"
+        },
+        {
+          "name": "only",
+          "type": "string[]",
+          "summary": "expose only these preset names"
+        },
+        {
+          "name": "defaults",
+          "type": "Record<string, object>",
+          "summary": "per-preset option defaults — where a scene house style lives"
+        },
+        {
+          "name": "cache",
+          "type": "boolean",
+          "summary": "hand the same instance back for the same id; off because two props are usually two objects",
+          "default": "false"
+        }
+      ]
+    },
+    {
+      "id": "camera",
+      "title": "Camera rig",
+      "summary": "The camera as a module: aims, re-frustums on resize, and optionally chases an object with damping. Publishes the generic camera-rig capability, so anything that wants to point the view can do so without knowing which projection it got.",
+      "subpath": "threejs-scene/modules/camera",
+      "factory": "cameraRig",
+      "tags": [
+        "camera",
+        "core"
+      ],
+      "cost": "free",
+      "peers": [],
+      "provides": [
+        "camera-rig"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "kind",
+          "type": "'iso' | 'follow' | 'perspective'",
+          "summary": "which projection the rig drives; iso requires an orthographic camera on createApp",
+          "default": "'perspective'"
+        },
+        {
+          "name": "target",
+          "type": "Vec3",
+          "summary": "the point the rig looks at",
+          "default": "[0, 0, 0]"
+        },
+        {
+          "name": "iso",
+          "type": "IsoCameraOptions",
+          "summary": "view size, flavor, yaw for the iso kind"
+        },
+        {
+          "name": "follow",
+          "type": "FollowCameraOptions",
+          "summary": "offset, look-ahead and damping half-lives for the follow kind"
+        },
+        {
+          "name": "followTarget",
+          "type": "(ctx: ModuleContext) => Object3D | null",
+          "summary": "resolved every tick, so the target may spawn after the rig mounts"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "title": "Renderer diagnostics",
+      "summary": "Audits shader program linking at start (a program that will not link kills the context on the first draw, and looks thermal) and samples draw calls, memory and frame time while the app runs.",
+      "subpath": "threejs-scene/modules/diagnostics",
+      "factory": "diagnostics",
+      "tags": [
+        "diagnostics",
+        "performance"
+      ],
+      "cost": "free",
+      "peers": [],
+      "provides": [
+        "diagnostics"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "audit",
+          "type": "boolean",
+          "summary": "run the program link audit at start; skipped when there is no GL context",
+          "default": "true"
+        },
+        {
+          "name": "every",
+          "type": "number",
+          "summary": "ticks between renderer.info samples",
+          "default": "30"
+        },
+        {
+          "name": "onSample",
+          "type": "(sample: DiagnosticsSample) => void",
+          "summary": "feed a HUD or a telemetry sink"
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "title": "Pointer input",
+      "summary": "Accumulates pointer, wheel and pinch events and publishes them as state as of the current tick, with a camera-aware raycast helper. Read it in update; a handler that writes the scene from an event is the classic break in the unidirectional flow.",
+      "subpath": "threejs-scene/modules/input",
+      "factory": "pointerInput",
+      "tags": [
+        "input",
+        "core"
+      ],
+      "cost": "free",
+      "peers": [],
+      "provides": [
+        "pointer-input"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "at",
+          "type": "string",
+          "summary": "mirror the pointer into app state under this key; omit to keep it out of state"
+        },
+        {
+          "name": "gesture",
+          "type": "{ tapThresholdMs?: number, tapMovePx?: number }",
+          "summary": "tap detection thresholds",
+          "default": "{ tapThresholdMs: 250, tapMovePx: 8 }"
+        }
+      ]
+    },
+    {
+      "id": "lighting",
+      "title": "Standard lighting",
+      "summary": "IBL environment + warm shadow-casting sun + hemisphere fill. The default rig for anything lit with physical materials; mount it before the content that needs the environment map.",
+      "subpath": "threejs-scene/modules/lighting",
+      "factory": "standardLighting",
+      "tags": [
+        "lighting",
+        "core"
+      ],
+      "cost": "medium",
+      "peers": [],
+      "provides": [
+        "lighting-rig"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "env",
+          "type": "boolean | { intensity?: number }",
+          "summary": "PMREM room-environment IBL; false for a stylized flat look or a headless test",
+          "default": "true"
+        },
+        {
+          "name": "sun",
+          "type": "LightingSunOptions",
+          "summary": "colour, intensity, position, and the shadow frustum/map size",
+          "default": "{ intensity: 3, position: [8, 12, 6] }"
+        },
+        {
+          "name": "hemi",
+          "type": "LightingHemiOptions",
+          "summary": "sky/ground fill colours and intensity",
+          "default": "{ intensity: 0.4 }"
+        }
+      ]
+    },
+    {
+      "id": "orbit",
+      "title": "Orbit controls",
+      "summary": "Drag to rotate, pinch or wheel to zoom, around a fixed target. View-only camera manipulation, deliberately outside app state — like scrolling a page.",
+      "subpath": "threejs-scene/modules/orbit",
+      "factory": "orbitControls",
+      "tags": [
+        "input",
+        "camera"
+      ],
+      "cost": "free",
+      "peers": [],
+      "provides": [
+        "camera-rig",
+        "orbit"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "rotateSpeed",
+          "type": "number",
+          "summary": "radians of rotation per dragged CSS pixel",
+          "default": "0.005"
+        },
+        {
+          "name": "zoomSpeed",
+          "type": "number",
+          "summary": "zoom factor per wheel deltaY unit",
+          "default": "0.001"
+        },
+        {
+          "name": "radius",
+          "type": "[number, number]",
+          "summary": "orbit radius clamp",
+          "default": "[2, 50]"
+        },
+        {
+          "name": "maxPhi",
+          "type": "number",
+          "summary": "vertical angle clamp in radians, ± from horizontal",
+          "default": "1.4"
+        },
+        {
+          "name": "target",
+          "type": "Vec3",
+          "summary": "the point the camera orbits and looks at",
+          "default": "[0, 0, 0]"
+        }
+      ]
+    },
+    {
+      "id": "persistence",
+      "title": "Persisted state slice",
+      "summary": "Restores one state key from storage during build — as a queued commit, so no module sees a half-restored world — and writes it back on a timer when it changed. Storage is synchronous; touching it per tick is a stutter.",
+      "subpath": "threejs-scene/modules/persistence",
+      "factory": "persistence",
+      "tags": [
+        "state",
+        "storage"
+      ],
+      "cost": "free",
+      "peers": [],
+      "provides": [
+        "persistence"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "key",
+          "type": "string",
+          "summary": "storage key; give each independent slice its own"
+        },
+        {
+          "name": "at",
+          "type": "string",
+          "summary": "the state key this module owns, restores and writes back"
+        },
+        {
+          "name": "initial",
+          "type": "T",
+          "summary": "seeded into state[at] when there is nothing stored"
+        },
+        {
+          "name": "fields",
+          "type": "string[]",
+          "summary": "which fields to persist; omit for the whole slice"
+        },
+        {
+          "name": "interval",
+          "type": "number",
+          "summary": "seconds between writes",
+          "default": "2"
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "summary": "a stored slice from another build is discarded, not merged",
+          "default": "'1'"
+        }
+      ]
+    },
+    {
+      "id": "physics",
+      "title": "Fixed-step rigid bodies",
+      "summary": "A cannon-es world stepped at a fixed rate with an accumulator, so the same tick sequence produces the same pile of barrels. Bind three objects to bodies with add(); the module syncs transforms after every step.",
+      "subpath": "threejs-scene/modules/physics",
+      "factory": "physicsWorld",
+      "tags": [
+        "physics",
+        "simulation"
+      ],
+      "cost": "heavy",
+      "peers": [
+        "cannon-es"
+      ],
+      "provides": [
+        "physics"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "gravity",
+          "type": "Vec3",
+          "summary": "acceleration in m/s²",
+          "default": "[0, -9.82, 0]"
+        },
+        {
+          "name": "step",
+          "type": "number",
+          "summary": "fixed simulation step in seconds; smaller is more stable and more expensive",
+          "default": "1/60"
+        },
+        {
+          "name": "maxSubSteps",
+          "type": "number",
+          "summary": "steps a single frame may run before time is dropped — the spiral-of-death guard",
+          "default": "4"
+        },
+        {
+          "name": "iterations",
+          "type": "number",
+          "summary": "constraint solver iterations; raise for stacks and cloth",
+          "default": "12"
+        },
+        {
+          "name": "allowSleep",
+          "type": "boolean",
+          "summary": "let resting bodies stop simulating",
+          "default": "true"
+        }
+      ]
+    },
+    {
+      "id": "postprocessing",
+      "title": "Post-processing chain",
+      "summary": "An EffectComposer as a module: RenderPass -> optional UnrealBloom -> your passes -> OutputPass. Claims the frame draw, so mounting it is all the wiring there is. Ordered last on purpose.",
+      "subpath": "threejs-scene/modules/post",
+      "factory": "postProcessing",
+      "tags": [
+        "post",
+        "render"
+      ],
+      "cost": "heavy",
+      "peers": [],
+      "provides": [
+        "post-chain"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "bloom",
+          "type": "PostProcessingBloom | false",
+          "summary": "UnrealBloom in the base chain, or false to omit it",
+          "default": "{}"
+        },
+        {
+          "name": "depth",
+          "type": "boolean",
+          "summary": "attach a shared depth texture — required by DOF, god rays, motion blur",
+          "default": "false"
+        },
+        {
+          "name": "effects",
+          "type": "(ctx: EffectContext) => Pass[]",
+          "summary": "build the custom passes to insert before tone-mapping"
+        },
+        {
+          "name": "onFrame",
+          "type": "(frame, ctx) => void",
+          "summary": "per-tick hook for time/camera-dependent pass uniforms"
+        },
+        {
+          "name": "onResize",
+          "type": "(size, ctx) => void",
+          "summary": "per-resize hook for passes that track resolution in a plain uniform"
+        }
+      ]
+    },
+    {
+      "id": "quality",
+      "title": "Quality governor",
+      "summary": "Picks a quality tier from device signals, measures frame time, steps down when the device cannot hold the budget, and remembers the verdict across loads. Publishes the tier so heavy modules size themselves to it instead of each guessing.",
+      "subpath": "threejs-scene/modules/quality",
+      "factory": "qualityGovernor",
+      "tags": [
+        "quality",
+        "performance"
+      ],
+      "cost": "free",
+      "peers": [],
+      "provides": [
+        "quality"
+      ],
+      "requires": [],
+      "optional": [],
+      "options": [
+        {
+          "name": "tiers",
+          "type": "QualityTier[]",
+          "summary": "the rungs, cheapest first",
+          "default": "DEFAULT_TIERS (low/medium/high)"
+        },
+        {
+          "name": "start",
+          "type": "string",
+          "summary": "starting rung by name; omit to pick from device signals"
+        },
+        {
+          "name": "budgetMs",
+          "type": "number",
+          "summary": "frame-time ceiling; sustained frames slower than this drop a rung",
+          "default": "20"
+        },
+        {
+          "name": "patience",
+          "type": "number",
+          "summary": "consecutive over-budget ticks before dropping",
+          "default": "45"
+        },
+        {
+          "name": "memoryKey",
+          "type": "string",
+          "summary": "storage key so a tier that crashed once is not offered again"
+        },
+        {
+          "name": "at",
+          "type": "string",
+          "summary": "mirror the tier and frame time into app state under this key"
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "asset-catalog": [
+      "assets"
+    ],
+    "camera-rig": [
+      "camera",
+      "orbit"
+    ],
+    "diagnostics": [
+      "diagnostics"
+    ],
+    "pointer-input": [
+      "input"
+    ],
+    "lighting-rig": [
+      "lighting"
+    ],
+    "orbit": [
+      "orbit"
+    ],
+    "persistence": [
+      "persistence"
+    ],
+    "physics": [
+      "physics"
+    ],
+    "post-chain": [
+      "postprocessing"
+    ],
+    "quality": [
+      "quality"
+    ]
+  }
+}

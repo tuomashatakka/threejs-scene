@@ -112,3 +112,8 @@ export type { AssetManifestEntry, AssetMaterialPresetName, TexturePresetName } f
 
 // migrated model-authored spec/validation/build/review/prompt/retry surface
 export * from './authoring/index.js'
+
+// the catalogue as a pluggable module — the pure functions above, given one
+// owner for disposal and one forked rng for reproducibility
+export { assetCatalog, descriptor } from './module.js'
+export type { AssetCatalogOptions } from './module.js'

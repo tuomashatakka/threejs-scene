@@ -3,9 +3,23 @@
 // wheel to zoom. View-only camera manipulation, deliberately outside app
 // state (like scrolling a page). Uses only the public lib surface.
 
-import { attachPointerGesture } from '../../lib/index.js'
+import { CameraRig, attachPointerGesture, capability, registerModule } from '../../lib/index.js'
 
-import type { AppModule, Vec3 } from '../../lib/index.js'
+import type { AppModule, CameraRigApi, Size, Vec3 } from '../../lib/index.js'
+
+
+/** What the orbit module publishes on top of the generic camera-rig contract. */
+export interface OrbitApi extends CameraRigApi {
+
+  /** Current spherical position as `[theta, phi, radius]`, in radians/metres. */
+  readonly spherical: readonly [number, number, number]
+
+  /** Set the spherical position directly — replays, saved viewpoints, tours. */
+  setSpherical (theta: number, phi: number, radius: number): void
+}
+
+/** The orbit rig itself, for anything that wants to drive or read the view. */
+export const Orbit = capability<OrbitApi>('orbit')
 
 
 /** Options for {@link orbitControls}. */
@@ -45,56 +59,113 @@ export function orbitControls<S extends object = Record<string, unknown>> ({
   maxPhi = 1.4,
   target = [ 0, 0, 0 ],
 }: OrbitOptions = {}): AppModule<S> {
-  let detach: (() => void) | null = null
+  const [ minRadius, maxRadius ] = radiusClamp
+  let [ tx, ty, tz ]             = target
+
+  let theta  = 0
+  let phi    = 0
+  let radius = minRadius
 
   return {
-    name: 'orbit',
+    name:     'orbit',
+    provides: [ CameraRig, Orbit ],
+
+    // input-shaped: run before the modules that read the camera
+    order: -100,
 
     build (ctx) {
-      const { camera }               = ctx
-      const [ minRadius, maxRadius ] = radiusClamp
-      const [ tx, ty, tz ]           = target
+      const { camera } = ctx
 
       const dx = camera.position.x - tx
       const dy = camera.position.y - ty
       const dz = camera.position.z - tz
 
-      let theta  = Math.atan2(dx, dz)
-      let phi    = Math.atan2(dy, Math.hypot(dx, dz))
-      let radius = Math.hypot(dx, dy, dz) || minRadius
+      theta  = Math.atan2(dx, dz)
+      phi    = Math.atan2(dy, Math.hypot(dx, dz))
+      radius = Math.hypot(dx, dy, dz) || minRadius
 
-      const updateCamera = (): void => {
-        const r = radius * Math.cos(phi)
+      const apply = (): void => {
+        const flat = radius * Math.cos(phi)
+
         camera.position.set(
-          tx + Math.sin(theta) * r,
+          tx + Math.sin(theta) * flat,
           ty + Math.sin(phi) * radius,
-          tz + Math.cos(theta) * r,
+          tz + Math.cos(theta) * flat,
         )
         camera.lookAt(tx, ty, tz)
       }
 
-      detach = attachPointerGesture(ctx.renderer.domElement, {
+      // the detach function is a resource like any other, so ctx.own runs it
+      ctx.own(attachPointerGesture(ctx.renderer.domElement, {
         onDrag (dragX, dragY) {
           theta -= dragX * rotateSpeed
           phi    = Math.max(-maxPhi, Math.min(maxPhi, phi + dragY * rotateSpeed))
-          updateCamera()
+          apply()
         },
         onPinch (deltaScale) {
           radius = Math.max(minRadius, Math.min(maxRadius, radius / deltaScale))
-          updateCamera()
+          apply()
         },
         onWheel (delta) {
           radius = Math.max(minRadius, Math.min(maxRadius, radius * (1 + delta * zoomSpeed)))
-          updateCamera()
+          apply()
         },
-      })
-    },
+      }))
 
-    dispose () {
-      detach?.()
-      detach = null
+      apply()
+
+      const api: OrbitApi = {
+        camera,
+        get spherical () {
+          return [ theta, phi, radius ] as const
+        },
+        setSpherical (nextTheta, nextPhi, nextRadius) {
+          theta  = nextTheta
+          phi    = Math.max(-maxPhi, Math.min(maxPhi, nextPhi))
+          radius = Math.max(minRadius, Math.min(maxRadius, nextRadius))
+          apply()
+        },
+        aim ([ x, y, z ]) {
+          tx = x
+          ty = y
+          tz = z
+          apply()
+        },
+        zoom (factor) {
+          radius = Math.max(minRadius, Math.min(maxRadius, radius / factor))
+          apply()
+        },
+        resize (_size: Size) {
+          apply()
+        },
+      }
+
+      ctx.provide(CameraRig, api)
+      ctx.provide(Orbit, api)
     },
   }
 }
+
+/** Registry entry — see {@link listModules}. */
+export const descriptor = registerModule({
+  id:    'orbit',
+  title: 'Orbit controls',
+  summary:
+    'Drag to rotate, pinch or wheel to zoom, around a fixed target. View-only camera ' +
+    'manipulation, deliberately outside app state — like scrolling a page.',
+  subpath:  'threejs-scene/modules/orbit',
+  factory:  'orbitControls',
+  tags:     [ 'input', 'camera' ],
+  cost:     'free',
+  provides: [ CameraRig, Orbit ],
+  options:  [
+    { name: 'rotateSpeed', type: 'number', summary: 'radians of rotation per dragged CSS pixel', default: '0.005' },
+    { name: 'zoomSpeed', type: 'number', summary: 'zoom factor per wheel deltaY unit', default: '0.001' },
+    { name: 'radius', type: '[number, number]', summary: 'orbit radius clamp', default: '[2, 50]' },
+    { name: 'maxPhi', type: 'number', summary: 'vertical angle clamp in radians, ± from horizontal', default: '1.4' },
+    { name: 'target', type: 'Vec3', summary: 'the point the camera orbits and looks at', default: '[0, 0, 0]' },
+  ],
+  create: (options?: OrbitOptions) => orbitControls(options),
+})
 
 // perf: cheap. no per-frame work — the camera moves only on input events.

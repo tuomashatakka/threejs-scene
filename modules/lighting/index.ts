@@ -1,13 +1,36 @@
-// modules/lighting.ts
+// modules/lighting/index.ts
 // The standard three-part lighting rig as an app module: PMREM room
 // environment for IBL, a warm shadow-casting sun, and a hemisphere fill.
 // Lives outside the core on purpose — it uses only the public lib surface,
 // proving the module contract is sufficient for built-ins.
+//
+// Scoped like every other module: the lights hang off ctx.root rather than off
+// the scene, the environment texture goes through ctx.own, and the one piece of
+// genuinely app-wide state it touches (scene.environment) is restored by an
+// explicit cleanup rather than left for the next mount to discover.
 
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
-import type { AppModule, SceneContext, Vec3 } from '../../lib/index.js'
+import { capability, registerModule } from '../../lib/index.js'
+
+import type { AppModule, ModuleContext, Vec3 } from '../../lib/index.js'
+
+
+/** What the lighting rig publishes so other modules can read or retune it. */
+export interface LightingRigApi {
+  readonly sun:  THREE.DirectionalLight
+  readonly hemi: THREE.HemisphereLight
+
+  /** The IBL texture, or `null` when `env: false`. */
+  readonly environment: THREE.Texture | null
+
+  /** Retune the sun without rebuilding the rig. */
+  setSun (options: Pick<LightingSunOptions, 'color' | 'intensity' | 'position'>): void
+}
+
+/** The scene's light rig, for modules that need to aim or dim it. */
+export const LightingRig = capability<LightingRigApi>('lighting-rig')
 
 
 /** Environment (IBL) tuning for {@link standardLighting}. */
@@ -89,7 +112,7 @@ function createSun ({
   return sun
 }
 
-function applyEnvironment (ctx: SceneContext, { intensity = 1 }: LightingEnvOptions): THREE.Texture {
+function applyEnvironment (ctx: ModuleContext, { intensity = 1 }: LightingEnvOptions): THREE.Texture {
   const pmrem      = new THREE.PMREMGenerator(ctx.renderer)
   const envScene   = new RoomEnvironment()
   const envTexture = pmrem.fromScene(envScene, 0.04).texture
@@ -111,41 +134,70 @@ function applyEnvironment (ctx: SceneContext, { intensity = 1 }: LightingEnvOpti
  * createApp(canvas, { use: [ standardLighting({ sun: { intensity: 2 } }) ] })
  */
 export function standardLighting<S extends object = Record<string, unknown>> (options: LightingOptions = {}): AppModule<S> {
-  let scene: THREE.Scene | null = null
-  let env: THREE.Texture | null = null
-  let sun: THREE.DirectionalLight
-  let hemi: THREE.HemisphereLight
-
   return {
-    name: 'lighting',
+    name:     'lighting',
+    provides: [ LightingRig ],
+
+    // lights first: a module that reads the rig in `start` needs it to exist
+    order: -50,
 
     build (ctx) {
-      scene = ctx.scene
-      if (options.env !== false)
-        env = applyEnvironment(ctx, options.env === true ? {} : options.env ?? {})
+      const env = options.env === false
+        ? null
+        : ctx.own(applyEnvironment(ctx, options.env === true ? {} : options.env ?? {}))
 
-      sun  = createSun(options.sun ?? {})
-      hemi = new THREE.HemisphereLight(
+      // scene.environment is app-wide, so put it back the way it was found
+      if (env)
+        ctx.onCleanup(() => {
+          ctx.scene.environment = null
+        })
+
+      const sun  = createSun(options.sun ?? {})
+      const hemi = new THREE.HemisphereLight(
         options.hemi?.skyColor ?? '#a0c0ff',
         options.hemi?.groundColor ?? '#3a2a1a',
         options.hemi?.intensity ?? 0.4,
       )
-      scene.add(sun, sun.target, hemi)
-    },
 
-    dispose () {
-      if (!scene)
-        return
-      if (env) {
-        env.dispose()
-        scene.environment = null
-      }
-      scene.remove(sun, sun.target, hemi)
-      scene = null
-      env   = null
+      // ctx.own detaches and disposes these; ctx.root scopes them to this module
+      ctx.root.add(ctx.own(sun), sun.target, ctx.own(hemi))
+
+      ctx.provide(LightingRig, {
+        sun,
+        hemi,
+        environment: env,
+        setSun ({ color, intensity, position }) {
+          if (color !== undefined)
+            sun.color.set(color)
+          if (intensity !== undefined)
+            sun.intensity = intensity
+          if (position !== undefined)
+            sun.position.set(...position)
+        },
+      })
     },
   }
 }
+
+/** Registry entry — see {@link listModules}. */
+export const descriptor = registerModule({
+  id:    'lighting',
+  title: 'Standard lighting',
+  summary:
+    'IBL environment + warm shadow-casting sun + hemisphere fill. The default rig for anything ' +
+    'lit with physical materials; mount it before the content that needs the environment map.',
+  subpath:  'threejs-scene/modules/lighting',
+  factory:  'standardLighting',
+  tags:     [ 'lighting', 'core' ],
+  cost:     'medium',
+  provides: [ LightingRig ],
+  options:  [
+    { name: 'env', type: 'boolean | { intensity?: number }', summary: 'PMREM room-environment IBL; false for a stylized flat look or a headless test', default: 'true' },
+    { name: 'sun', type: 'LightingSunOptions', summary: 'colour, intensity, position, and the shadow frustum/map size', default: '{ intensity: 3, position: [8, 12, 6] }' },
+    { name: 'hemi', type: 'LightingHemiOptions', summary: 'sky/ground fill colours and intensity', default: '{ intensity: 0.4 }' },
+  ],
+  create: (options?: LightingOptions) => standardLighting(options),
+})
 
 // perf: medium. shadow render pass per sun per frame. Tune shadowMapSize down
 // for mobile.

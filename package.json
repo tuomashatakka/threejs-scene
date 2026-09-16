@@ -1,7 +1,7 @@
 {
   "name": "threejs-scene",
-  "version": "0.6.2",
-  "description": "Deterministic imperative three.js scenes with an LLM-first procedural asset toolkit, fixed-step physics, and explicit disposal.",
+  "version": "0.7.0",
+  "description": "Deterministic imperative three.js scenes: a scoped, unidirectional module contract, an LLM-first procedural asset toolkit, fixed-step physics, explicit disposal \u2014 and the instructions, agents and enforced rules shipped inside the package.",
   "type": "module",
   "main": "./dist/cjs/lib/index.js",
   "types": "./dist/lib/index.d.ts",
@@ -76,6 +76,96 @@
         "default": "./dist/cjs/modules/post/webgl/index.js"
       }
     },
+    "./modules/camera": {
+      "import": {
+        "types": "./dist/modules/camera/index.d.ts",
+        "default": "./dist/modules/camera/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/camera/index.d.ts",
+        "default": "./dist/cjs/modules/camera/index.js"
+      }
+    },
+    "./modules/input": {
+      "import": {
+        "types": "./dist/modules/input/index.d.ts",
+        "default": "./dist/modules/input/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/input/index.d.ts",
+        "default": "./dist/cjs/modules/input/index.js"
+      }
+    },
+    "./modules/quality": {
+      "import": {
+        "types": "./dist/modules/quality/index.d.ts",
+        "default": "./dist/modules/quality/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/quality/index.d.ts",
+        "default": "./dist/cjs/modules/quality/index.js"
+      }
+    },
+    "./modules/diagnostics": {
+      "import": {
+        "types": "./dist/modules/diagnostics/index.d.ts",
+        "default": "./dist/modules/diagnostics/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/diagnostics/index.d.ts",
+        "default": "./dist/cjs/modules/diagnostics/index.js"
+      }
+    },
+    "./modules/persistence": {
+      "import": {
+        "types": "./dist/modules/persistence/index.d.ts",
+        "default": "./dist/modules/persistence/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/persistence/index.d.ts",
+        "default": "./dist/cjs/modules/persistence/index.js"
+      }
+    },
+    "./modules/all": {
+      "import": {
+        "types": "./dist/modules/all/index.d.ts",
+        "default": "./dist/modules/all/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/modules/all/index.d.ts",
+        "default": "./dist/cjs/modules/all/index.js"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/lib/testing/index.d.ts",
+        "default": "./dist/lib/testing/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/lib/testing/index.d.ts",
+        "default": "./dist/cjs/lib/testing/index.js"
+      }
+    },
+    "./llm": {
+      "import": {
+        "types": "./dist/lib/llm/index.d.ts",
+        "default": "./dist/lib/llm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/lib/llm/index.d.ts",
+        "default": "./dist/cjs/lib/llm/index.js"
+      }
+    },
+    "./eslint": {
+      "types": "./eslint/index.d.ts",
+      "default": "./eslint/index.mjs"
+    },
+    "./llms.txt": "./llms.txt",
+    "./llm/AGENTS.md": "./llm/AGENTS.md",
+    "./llm/RULES.md": "./llm/RULES.md",
+    "./llm/rules.json": "./llm/rules.json",
+    "./llm/modules.json": "./llm/modules.json",
+    "./llm/index.json": "./llm/index.json",
     "./modules/*": {
       "import": {
         "types": "./dist/modules/*.d.ts",
@@ -90,6 +180,9 @@
   },
   "files": [
     "dist",
+    "bin",
+    "eslint",
+    "llm",
     "llms.txt",
     "readme.md",
     "LICENSE"
@@ -104,10 +197,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "dev": "npm run build && vite site",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build && npm run llms && publint && attw --pack .",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build && npm run llms && npm run llm:assets && publint && attw --pack . --exclude-entrypoints llms.txt llm/AGENTS.md llm/RULES.md --ignore-rules cjs-resolves-to-esm",
     "prepare": "npm run build",
     "llms": "bun scripts/gen-llms.ts",
-    "llms:check": "bun scripts/gen-llms.ts --check"
+    "llms:check": "bun scripts/gen-llms.ts --check",
+    "llm:assets": "bun scripts/gen-llm-assets.ts",
+    "llm:assets:check": "bun scripts/gen-llm-assets.ts --check"
   },
   "repository": {
     "type": "git",
@@ -156,6 +251,12 @@
   "module": "./dist/lib/index.js",
   "typesVersions": {
     "*": {
+      "testing": [
+        "./dist/lib/testing/index.d.ts"
+      ],
+      "llm": [
+        "./dist/lib/llm/index.d.ts"
+      ],
       "modules/*": [
         "./dist/cjs/modules/*.d.ts",
         "./dist/cjs/modules/*/index.d.ts"
@@ -166,5 +267,8 @@
     "cannon-es": {
       "optional": true
     }
+  },
+  "bin": {
+    "threejs-scene": "./bin/cli.mjs"
   }
 }

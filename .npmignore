@@ -9,6 +9,7 @@ node_modules/
 .claude/
 screenshot.png
 ARCHITECTURE.md
+potential-modules.html
 *.config.ts
 *.config.mjs
 tsconfig*.json

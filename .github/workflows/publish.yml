@@ -60,10 +60,19 @@ jobs:
       - name: Check the llm reference is current
         run: bun run llms:check
 
+      # Same reasoning, one level up: the rule catalogue and the module
+      # catalogue are generated from the built output and committed, so a rule
+      # or a module added without regenerating them would ship instructions
+      # that disagree with the code — and an agent trusts the instructions.
+      - name: Check the llm assets are current
+        run: bun run llm:assets:check
+
       - name: Check the published shape
         run: |
           bunx publint
-          bunx --bun @arethetypeswrong/cli --pack .
+          bunx --bun @arethetypeswrong/cli --pack . \
+            --exclude-entrypoints llms.txt llm/AGENTS.md llm/RULES.md \
+            --ignore-rules cjs-resolves-to-esm
 
       - name: Publish
         run: npm publish --access public --tag "${{ inputs.tag }}"

@@ -8,18 +8,56 @@ dispose chain. The successor core of `threejs-scenes` v3, rebuilt small.
 
 ## For coding agents
 
-The package ships **[`llms.txt`](llms.txt)** — every export with its real
-signature, grouped by import path, plus the contract and the handful of rules
-that separate code which compiles from code which behaves. It is generated from
-the built type declarations, so it cannot drift from the version you installed.
+The package ships its own instructions. Not a link to docs — the files, inside `node_modules`,
+generated from the code so they cannot describe a function that no longer takes those arguments.
 
-```
-node_modules/threejs-scene/llms.txt
+```sh
+npx threejs-scene doctor          # check what shipped
+npx threejs-scene rules SC004     # any rule, in full
+npx threejs-scene modules         # every module: what it does, what it provides, what it costs
+npx threejs-scene agents install  # six agent definitions into .claude/agents
+npx threejs-scene instructions    # AGENTS.md into your project root
 ```
 
-Read that instead of guessing at the API. Regenerate after any signature change
-with `npm run llms`; `npm run llms:check` fails if it is stale, and the release
-workflow runs it.
+| file | what it is |
+| --- | --- |
+| [`llms.txt`](llms.txt) | every export with its real signature, grouped by import path. Generated from the built `.d.ts` |
+| [`llm/AGENTS.md`](llm/AGENTS.md) | how to *compose* it: the contract, the three properties, the rules, six worked recipes |
+| [`llm/RULES.md`](llm/RULES.md) | the 17 enforced rules, each with its rationale and a wrong/right pair |
+| [`llm/rules.json`](llm/rules.json) · [`llm/modules.json`](llm/modules.json) | the same, machine-readable |
+| [`llm/agents/`](llm/agents) | scene builder, module author, effect author, asset author, determinism auditor, performance auditor |
+| [`llm/skills/threejs-scene/`](llm/skills/threejs-scene) | the package as a skill |
+
+Or reach the same content in code:
+
+```ts
+import 'threejs-scene/modules/all'
+import { instructions, RULES, listModules } from 'threejs-scene/llm'
+
+const system = `${basePrompt}\n\n${instructions()}`
+```
+
+The rules are not advice. Three things enforce them, all reporting the same ids:
+
+- **Strict mode**, on by default outside `NODE_ENV=production`. It traps `Math.random`/`Date.now`/
+  `performance.now` during lifecycle calls and attributes the call site, deep-freezes the state a
+  module is handed, diffs the scene after every build, counts per-tick allocation, and checks that
+  every declared capability was actually published. `app.violations` is the log.
+- **An ESLint plugin**, shipped at `threejs-scene/eslint` — seven AST rules, same ids, before the
+  code runs.
+
+  ```js
+  // eslint.config.mjs
+  import threejsScene from 'threejs-scene/eslint'
+  export default [ ...threejsScene.configs.recommended ]
+  ```
+
+- **A contract test kit**, `threejs-scene/testing`. `auditModule()` runs a module through two full
+  lifecycles and reports violations, undisposed GPU resources, objects stranded on the scene, and
+  any difference between the two runs from the same seed.
+
+`npm run llms` and `npm run llm:assets` regenerate; the `:check` variants fail when stale, and the
+release workflow runs both, so a signature or a rule cannot ship with a doc that disagrees.
 
 ## Install
 
@@ -30,35 +68,93 @@ npm i threejs-scene three
 ## Use
 
 ```ts
+import * as THREE from 'three'
 import { createApp, defineModule } from 'threejs-scene'
 import { standardLighting } from 'threejs-scene/modules/lighting'
 import { orbitControls } from 'threejs-scene/modules/orbit'
 
 interface State { speed: number }
 
-const turbine = defineModule<State>({
-  name: 'turbine',
-  build (ctx)                { /* create objects once, add to ctx.scene */ },
-  update (state, frame, ctx) { /* project state onto them, every sim tick */ },
-})
+function turbine () {
+  let blades: THREE.Group
+
+  return defineModule<State>({
+    name: 'turbine',
+
+    build (ctx) {
+      // ctx.root is this module's subtree; ctx.own() releases at teardown
+      const geometry = ctx.own(new THREE.BoxGeometry(0.2, 2, 0.05))
+      const material = ctx.own(new THREE.MeshStandardMaterial())
+
+      blades = ctx.own(new THREE.Group())
+      blades.add(new THREE.Mesh(geometry, material))
+      ctx.root.add(blades)
+    },
+
+    update (state, frame) {
+      blades.rotation.z += state.speed * frame.delta
+    },
+  })
+}
 
 const app = createApp<State>(canvas, {
   state: { speed: 1 },
   seed:  7,
+  loop:  { fps: 0 },
   clock: { mode: 'fixed', step: 1 / 120 },
   use:   [ standardLighting(), orbitControls() ],
 })
 
-app.use(turbine)          // runtime add; returned handle.remove() tears down
-app.start()               // or app.tick() for deterministic stepping
+const handle = app.use(turbine())   // handle.remove() detaches and disposes it
+app.start()                         // or app.tick() for deterministic stepping
 app.setState({ speed: 2 })
+app.violations                      // contract breaches; empty is the goal
 app.dispose()
 ```
 
-The contract: state flows down (`store -> module.update -> scene`, once per
-simulation tick), input flows back through `setState`/`dispatch` — never
-straight into scene objects. Same seed + same tick sequence reproduce the
-exact same world, headless included.
+Every lifecycle method handles data in one direction, inside one scope.
+
+**Scoped.** A module owns a `THREE.Group` (`ctx.root`), a random stream forked from its own id, one
+state key, and a disposal ledger — and nothing else owns those. `ctx.own(x)` takes anything with a
+`dispose()`, any `Object3D`, or a teardown function, and releases it in reverse order when the
+module goes away. Teardown is the exact inverse of build whether the module remembered or not.
+
+**Unidirectional.** `store -> select -> update -> scene`, once per simulation tick. A module writes
+state with `ctx.commit(patch)`, which is *queued* and applied after every module has updated — so
+every module in a tick sees the same world, and no write lands halfway through one. Only a module
+that declares the state key it owns may commit:
+
+```ts
+import { defineScopedModule } from 'threejs-scene'
+
+const weather = defineScopedModule<State, 'weather'>('weather', { rain: 0 }, {
+  name:   'weather',
+  build:  () => {},
+  update: (weather, frame, ctx) => ctx.commit({ rain: weather.rain + frame.delta * 0.1 }),
+})
+```
+
+**Deterministic.** Mount order is a pure function of the module list: a stable topological sort over
+declared capabilities, tie-broken by `order` band then insertion. Same seed plus same tick sequence
+reproduces the same world, headless included.
+
+**Pluggable.** Modules find each other through capability tokens rather than imports, so
+implementations are swappable:
+
+```ts
+import { capability, CameraRig } from 'threejs-scene'
+
+defineModule({
+  name:     'chase',
+  requires: [ CameraRig ],            // orders the provider before this module
+  build:    () => {},
+  start:    ctx => ctx.resolve(CameraRig).aim([ 0, 1, 0 ]),
+})
+```
+
+`orbitControls()` and `cameraRig()` both provide `camera-rig`; a module that only needs to point the
+view never learns which one it got. `npx threejs-scene modules` lists every module and what it
+provides.
 
 ## Post-processing
 
@@ -544,11 +640,16 @@ audit), `camera/` (iso + follow rigs), `quality/` (device signals, ladder
 memory), `lifecycle/` (dispose), `input/` (pointer-gesture), `app/`
 (composition root).
 
-Every entry in `modules/` is a folder with an `index.ts` — `lighting/`,
-`orbit/`, `post/` (the post-processing module, its passes, `shared/` GLSL, and
-the `webgl/` catalogue), `assets/` (all procedural content and model authoring),
-and optional `physics/`. They use
-only the public surface.
+Every entry in `modules/` is a folder with an `index.ts` — `lighting/`, `orbit/`, `camera/`,
+`input/`, `quality/`, `diagnostics/`, `persistence/`, `post/` (the post-processing module, its
+passes, `shared/` GLSL, and the `webgl/` catalogue), `assets/` (all procedural content and model
+authoring), and optional `physics/`. `all/` re-exports the lot, and is what populates the module
+registry. They use only the public surface, which is the point: if the contract were not sufficient
+for the built-ins, it would not be sufficient for yours.
+
+`llm/` is the payload shipped for language models — hand-written instructions and agent definitions
+plus the generated rule and module catalogues. `eslint/` is the flat-config plugin, and `bin/` the
+CLI; both are plain JavaScript, published uncompiled.
 
 `site/` is the Vite-built public site: a landing page, one interactive page that
 is both the dev playground and the live post-processing demo, and the starters
@@ -597,6 +698,11 @@ copies of every module, so class identity and `instanceof` stop agreeing.
 `npm run build` (clean, then tsc → `dist/` ESM + `dist/cjs/` CommonJS) ·
 `npm run build:site` (Vite → `site/dist/`, the deployed site, which consumes the
 built package). CI builds both and publishes `site/dist` to GitHub Pages.
+
+`npm run llms` regenerates `llms.txt` from the built `.d.ts`; `npm run llm:assets` regenerates
+`llm/RULES.md`, `llm/rules.json`, `llm/modules.json` and `llm/index.json` from the rule catalogue
+and the module registry. Both have a `:check` variant that fails when the committed file is stale,
+and the release workflow runs both — a signature or a rule cannot ship with a doc that disagrees.
 
 The dual build is two `tsc` passes over the same sources — `tsconfig.build.json`
 (ESM) and `tsconfig.build.cjs.json` (CommonJS) — followed by writing

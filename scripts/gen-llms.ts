@@ -31,6 +31,13 @@ const ENTRIES: readonly { subpath: string, index: string, blurb: string }[] = [
   { subpath: 'threejs-scene/modules/lighting', index: 'modules/lighting/index.d.ts', blurb: 'standard light rigs' },
   { subpath: 'threejs-scene/modules/orbit', index: 'modules/orbit/index.d.ts', blurb: 'orbit controls as a module' },
   { subpath: 'threejs-scene/modules/physics', index: 'modules/physics/index.d.ts', blurb: 'fixed-step rigid bodies, cloth, liquid. Needs the optional `cannon-es` peer' },
+  { subpath: 'threejs-scene/modules/camera', index: 'modules/camera/index.d.ts', blurb: 'the camera as a module: iso, follow, or perspective, publishing the camera-rig capability' },
+  { subpath: 'threejs-scene/modules/input', index: 'modules/input/index.d.ts', blurb: 'pointer, wheel and pinch sampled into the tick, with a camera-aware raycast' },
+  { subpath: 'threejs-scene/modules/quality', index: 'modules/quality/index.d.ts', blurb: 'the device-quality ladder: pick a tier, measure, step down, remember' },
+  { subpath: 'threejs-scene/modules/diagnostics', index: 'modules/diagnostics/index.d.ts', blurb: 'shader link audit at start, renderer.info sampling while running' },
+  { subpath: 'threejs-scene/modules/persistence', index: 'modules/persistence/index.d.ts', blurb: 'one state key restored from storage as a queued commit, written back on a timer' },
+  { subpath: 'threejs-scene/testing', index: 'lib/testing/index.d.ts', blurb: 'the contract test kit: auditModule, headlessApp, testModuleContext, snapshotObject' },
+  { subpath: 'threejs-scene/llm', index: 'lib/llm/index.d.ts', blurb: 'the rules and the module catalogue as data, for a host composing a prompt' },
 ]
 
 interface Symbol_ {
@@ -178,51 +185,79 @@ import { createApp, defineModule } from 'threejs-scene'
 interface State { speed: number }
 
 const turbine = defineModule<State>({
-  name: 'turbine',
-  build (ctx)                { /* create objects once, add to ctx.scene */ },
-  update (state, frame, ctx) { /* project state onto them, every sim tick */ },
-  resize (size, ctx)         { /* optional */ },
-  render (frame, ctx)        { /* optional — claims the draw */ },
-  dispose ()                 { /* release everything build allocated */ },
+  name:     'turbine',           // unique; also the rng fork label
+  provides: [ TurbineRig ],      // capabilities published with ctx.provide
+  requires: [ Physics ],         // capabilities resolved with ctx.resolve
+  select:   state => state,      // pure projection: what update() reads
+
+  build (ctx)               { /* create ONCE, into ctx.root, through ctx.own */ },
+  start (ctx)               { /* every module has built — resolve peers here */ },
+  update (view, frame, ctx) { /* project the slice onto the scene */ },
+  resize (size, ctx)        { /* optional */ },
+  render (frame, ctx)       { /* optional — claims the draw */ },
+  dispose ()                { /* only what ctx.own could not cover */ },
 })
 
-const app = createApp<State>(canvas, { state: { speed: 1 }, use: [ turbine ] })
+const app = createApp<State>(canvas, { state: { speed: 1 }, loop: { fps: 0 }, use: [ turbine ] })
 
 app.start()                    // attach to the frame loop
-app.setState({ speed: 2 })     // shallow-merge, notifies subscribers
+app.setState({ speed: 2 })     // from OUTSIDE a lifecycle hook only
 app.tick(1 / 60)               // step deterministically instead (headless)
+app.violations                 // contract breaches; empty is the goal
 app.dispose()                  // loop, modules (reverse order), scene, renderer
 \`\`\`
 
-State flows **down** (\`store → module.update → scene\`); input flows **back**
-through \`setState\`/\`dispatch\`. Never write app state from inside a scene object.
-Same seed plus same tick sequence reproduces the same world, headless included.
+Modules are **scoped**: \`ctx.root\` is a Group attached at mount and disposed at teardown,
+\`ctx.own(x)\` registers anything disposable and returns it, and \`ctx.rng\` is already forked by
+module id.
 
-\`ctx\` is a \`SceneContext\`: \`{ scene, camera, renderer, rng, clock }\`. The \`rng\`
-is seeded from \`AppOptions.seed\`.
+Flow is **unidirectional**: \`store -> select -> update -> scene\`. A module writes state with
+\`ctx.commit(patch)\`, which is queued and drained after every module has updated — never mid-tick.
+Only a module declaring a state scope (\`defineScopedModule\`) may commit.
+
+Order is **deterministic**: a stable topological sort over declared capabilities, tie-broken by the
+\`order\` band then insertion. Same seed plus same tick sequence reproduces the same world.
+
+\`ctx\` is a \`ModuleContext\` — \`{ scene, camera, renderer, rng, loop }\` plus \`root\`, \`size\`,
+\`own\`, \`onCleanup\`, \`commit\`, \`dispatch\`, \`provide\`, \`resolve\`, \`tryResolve\`, \`violations\`.
+
+Strict mode (on outside \`NODE_ENV=production\`) enforces the rules below and reports each with its
+code. Full text: \`llm/RULES.md\`, or \`npx threejs-scene rules\`.
 
 ## Rules that stop working code from behaving wrongly
 
-1. **\`createApp\` owns the only render loop.** Never call
-   \`requestAnimationFrame\` yourself. Animate in \`update\`.
-2. **The frame cap is page-global.** \`loop.fps\` goes to a shared framecapper
+The full catalogue — seventeen rules with rationale and a wrong/right pair each — is
+\`llm/RULES.md\`, or \`npx threejs-scene rules\`. The ones that bite first:
+
+1. **\`createApp\` owns the only render loop** (\`SC001\`). Never call
+   \`requestAnimationFrame\` yourself, and never subscribe to \`ctx.loop\` from a
+   module — in strict mode it refuses. Animate in \`update\`.
+2. **The frame cap is page-global** (\`SC013\`). \`loop.fps\` goes to a shared framecapper
    ([\`@tuomashatakka/canvas-loop-framecapper\`](https://www.npmjs.com/package/@tuomashatakka/canvas-loop-framecapper)),
    so it applies to every loop on the page. Always pass it explicitly, including
    \`0\` for uncapped — a scene that omits it inherits whatever the last one asked
    for.
 3. **The loop starts paused.** Call \`start()\`, or \`tick()\` per frame yourself.
 4. **Generation in \`build\`, animation in \`update\`, viewport in \`resize\`,
-   teardown in \`dispose\`.** Everything a module puts on the GPU it releases.
-5. **Only one \`render\` hook wins.** Last-mounted module takes it; a top-level
-   \`AppOptions.render\` overrides all of them. Prefer the module.
-6. **\`modules/assets\` is DOM-free and SSR-safe** — textures are \`DataTexture\`,
+   teardown in \`dispose\`** (\`SC012\`). Build into \`ctx.root\` (\`SC004\`) and route every
+   GPU allocation through \`ctx.own\` (\`SC005\`) — then teardown is automatic and exact.
+5. **Only one \`render\` hook wins** (\`SC011\`). The last module in resolved order takes it;
+   a top-level \`AppOptions.render\` overrides all of them. Prefer the module.
+6. **\`modules/assets\` is DOM-free and SSR-safe** (\`SC014\`) — textures are \`DataTexture\`,
    never canvas. Keep it that way; it is what makes headless tests work.
-7. **Determinism is a feature.** Use \`createSeededRng\` and fork it by name
-   (\`rng.fork('trees')\`) so adding one consumer does not reshuffle every consumer
-   after it. Never \`Math.random\`. Never \`Date.now\` for animation — take time
-   from \`frame\`.
-8. **\`disposeScene\` and \`disposeMaterial\` dispose indiscriminately.** If you
-   pool materials, mark them with \`markShared\` and tear down per module instead.
+7. **Determinism is a feature** (\`SC002\`, \`SC003\`). \`ctx.rng\` is already forked by module
+   id; fork it again per feature (\`rng.fork('trees')\`) so adding one consumer does not
+   reshuffle every consumer after it. Never \`Math.random\`. Never \`Date.now\` for animation —
+   take time from \`frame\`.
+8. **Never write app state from inside a lifecycle hook** (\`SC006\`). \`ctx.commit(patch)\`
+   queues the write and the runtime drains it at the tick boundary, so every module in a tick
+   sees the same world. Only a module with a declared state scope may commit (\`SC007\`).
+9. **\`disposeScene\` and \`disposeMaterial\` dispose indiscriminately** (\`SC015\`). If you
+   pool materials, mark them \`userData.shared = true\` and tear down per module instead.
+
+Check your own work with \`auditModule()\` from \`threejs-scene/testing\`: it runs a module
+through two full lifecycles and reports violations, leaks, stranded children, and any difference
+between the two runs from the same seed.
 
 ## Choosing an import path
 

@@ -180,7 +180,13 @@ describe('createApp', () => {
     })
 
     app.tick(0.03)
-    expect(render).toHaveBeenCalledWith(expect.objectContaining({ delta: 0.03 }), app.ctx)
+
+    // the module receives its own scoped context, not the app's — same scene,
+    // camera and renderer, plus the module root, forked rng, and commit queue
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({ delta: 0.03 }),
+      expect.objectContaining({ id: 'post', scene: app.ctx.scene, camera: app.ctx.camera }),
+    )
     expect(renderer.render).not.toHaveBeenCalled()
     app.dispose()
   })

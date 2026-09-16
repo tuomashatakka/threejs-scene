@@ -1,0 +1,84 @@
+name: CI
+
+# Every pull request, and every push to main. The repo had neither until now:
+# `publish.yml` runs the full gate but only on a manual release, and `pages.yml`
+# only builds the site. That left the generated files — `llms.txt` and the
+# `llm/` catalogues — with nothing checking them until the moment someone tried
+# to publish, which is the worst time to discover that the shipped rule list
+# describes a rule the code no longer has.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second push supersedes the first: nobody needs the verdict on a commit that
+# has already been replaced. Pushes to main are exempt, so the branch always
+# ends up with a result against its actual head.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+
+      # The generated docs are built from dist, so they can only be checked
+      # after a build.
+      - run: bun run build
+
+      # Checked, never rewritten. Both files are committed, and a workflow that
+      # regenerates a committed doc hides the signature or rule change that made
+      # it stale behind a green tick.
+      - name: Check the llm reference is current
+        run: bun run llms:check
+
+      - name: Check the llm assets are current
+        run: bun run llm:assets:check
+
+      - name: Check the published shape
+        run: |
+          bunx publint
+          bunx --bun @arethetypeswrong/cli --pack . \
+            --exclude-entrypoints llms.txt llm/AGENTS.md llm/RULES.md \
+            --ignore-rules cjs-resolves-to-esm
+
+      # The plugin is published uncompiled and loaded directly by a consumer's
+      # eslint.config.mjs, so "it parses and exposes its rules" is a thing CI
+      # has to assert — nothing else in the pipeline imports it.
+      - name: Check the shipped ESLint plugin loads
+        run: |
+          node --check eslint/index.mjs
+          node --check bin/cli.mjs
+          node -e "
+            import('./eslint/index.mjs').then(({ default: plugin }) => {
+              const rules = Object.keys(plugin.rules)
+              if (rules.length === 0) throw new Error('the plugin exposes no rules')
+              if (!plugin.configs?.recommended) throw new Error('the plugin has no recommended config')
+              console.log('eslint plugin ok:', rules.join(', '))
+            })
+          "
+
+      # Same reasoning for the CLI: it reads the generated payloads, so this
+      # also proves they are present and parseable in a clean checkout.
+      - name: Check the shipped CLI finds its payloads
+        run: node bin/cli.mjs doctor

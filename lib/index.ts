@@ -9,9 +9,51 @@ export * from './types.js'
 
 // app — the composition root
 export { createApp } from './app/create-app.js'
-export { defineModule } from './app/module.js'
+export { ModulePhase, defineModule, defineScopedModule } from './app/module.js'
+export { capability, capabilityName, isCapability } from './app/capability.js'
+export { definePlugin, flattenPlugins } from './app/plugin.js'
+export { createModuleRuntime, resolveOrder } from './app/runtime.js'
+export {
+  capabilityMap,
+  createRegisteredModule,
+  describeModules,
+  findModuleDescriptor,
+  listModules,
+  moduleCatalog,
+  registerModule,
+} from './app/registry.js'
+export { consoleReporter, deepFreeze, resolveStrict, violationOf } from './app/strict.js'
+export { AssetCatalog, CameraRig, Persistence, PointerInput, PostChain, Quality } from './app/capabilities.js'
+export type {
+  AssetCatalogApi,
+  CameraRigApi,
+  PersistenceApi,
+  PointerInputApi,
+  PointerState,
+  PostChainApi,
+  QualityApi,
+  QualityTier,
+} from './app/capabilities.js'
 export type { App, AppOptions, AppCameraOptions, AppSceneOptions, AppLoopOptions } from './app/create-app.js'
-export type { AppModule, ModuleHandle } from './app/module.js'
+export type {
+  AnyAppModule,
+  AppModule,
+  ModuleContext,
+  ModuleHandle,
+  ModulePatch,
+  ModuleStateScope,
+  OwnedResource,
+  StateScope,
+} from './app/module.js'
+export type { AnyCapability, Capability, CapabilityRef, CapabilityValue } from './app/capability.js'
+export type { Plugin, PluginInput } from './app/plugin.js'
+export type { ModuleRuntime, ModuleRuntimeOptions, MountedModule } from './app/runtime.js'
+export type { ModuleDescriptor, ModuleOption } from './app/registry.js'
+export type { ModuleViolation, StrictConfig, StrictOptions, ViolationReporter } from './app/strict.js'
+
+// llm — the machine-readable half of the documentation, shipped with the code
+export { RULES, RuleEnforcement, RuleSeverity, findRule, ruleMessage } from './llm/rules.js'
+export type { Rule, RuleCode } from './llm/rules.js'
 
 // time — when things happen
 export { createClock } from './time/clock.js'
@@ -30,7 +72,7 @@ export type { Store, Reducer, StoreListener } from './state/store.js'
 
 // camera — prebuilt rigs for createApp's `camera` option
 export { createIsoCamera, resizeIsoCamera, aimIsoCamera, createFollowCamera } from './camera/index.js'
-export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions } from './camera/index.js'
+export type { IsoCameraOptions, IsoAimOptions, FollowCamera, FollowCameraOptions, FollowCameraStation } from './camera/index.js'
 
 // render — how it reaches the screen
 export { createRenderer } from './render/renderer.js'
