@@ -609,3 +609,40 @@ describe('auditModule', () => {
     expect(audit.report).toContain('SC002')
   })
 })
+
+describe('simulation time', () => {
+  it('gives every sub-step of one pump its own elapsed', () => {
+    const seen: number[] = []
+    const { app }        = makeApp({ clock: { mode: 'fixed', step: 0.01 }})
+
+    app.use(defineModule<State>({
+      name:   'stopwatch',
+      build:  () => {},
+      update: (_state, frame) => seen.push(Number(frame.elapsed.toFixed(4))),
+    }))
+
+    // one pump, three sub-steps: time must advance across them, not jump to the
+    // end of the pump and repeat
+    app.tick(0.035)
+
+    expect(seen).toEqual([ 0.01, 0.02, 0.03 ])
+    app.dispose()
+  })
+
+  it('keeps sub-step time continuous across pumps', () => {
+    const seen: number[] = []
+    const { app }        = makeApp({ clock: { mode: 'fixed', step: 0.01 }})
+
+    app.use(defineModule<State>({
+      name:   'stopwatch',
+      build:  () => {},
+      update: (_state, frame) => seen.push(Number(frame.elapsed.toFixed(4))),
+    }))
+
+    app.tick(0.025)
+    app.tick(0.025)
+
+    expect(seen).toEqual([ 0.01, 0.02, 0.03, 0.04, 0.05 ])
+    app.dispose()
+  })
+})

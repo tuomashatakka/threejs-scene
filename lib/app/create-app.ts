@@ -305,17 +305,31 @@ export function createApp<S extends object = Record<string, unknown>, A = Partia
   // one simulation tick: state -> modules. Never the reverse.
   let frame = 0
 
-  function step (delta: number): void {
+  function step (delta: number, elapsed: number): void {
     frame += 1
-    runtime.update({ delta, elapsed: clock.elapsed(), frame })
+    runtime.update({ delta, elapsed, frame })
   }
 
   // one pump per real frame: 0..n sim ticks, then exactly one render.
   // Draw path priority: the AppOptions.render override, else the claiming
   // module's render hook (post-processing composer), else the plain scene render.
   function pump (realDelta: number): void {
-    for (const delta of clock.advance(realDelta))
-      step(delta)
+    const deltas = clock.advance(realDelta)
+
+    // `advance` has already banked every step it is about to hand back, so
+    // clock.elapsed() is end-of-pump time. Reading it per sub-step would give
+    // all three ticks of one pump the same `elapsed` — a module animating from
+    // it would jump 3 × step and then stand still, which is deterministic and
+    // wrong. Walk forward from where the pump started instead.
+    let elapsed = clock.elapsed()
+
+    for (const delta of deltas)
+      elapsed -= delta
+
+    for (const delta of deltas) {
+      elapsed += delta
+      step(delta, elapsed)
+    }
 
     const frameCtx: FrameContext = { delta: realDelta, elapsed: clock.elapsed(), frame }
 
