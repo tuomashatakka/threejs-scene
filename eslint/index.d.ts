@@ -23,23 +23,27 @@ export interface FlatConfig {
 
 /** The rules, keyed by the kebab ids from the shared rule catalogue. */
 export declare const rules: Record<
-  | 'single-frame-loop'
-  | 'no-nondeterminism'
-  | 'fork-rng-by-name'
-  | 'scoped-root'
-  | 'no-state-write-in-update'
-  | 'sync-lifecycle'
-  | 'dom-free-assets',
+  | 'single-frame-loop' |
+  'no-nondeterminism' |
+  'fork-rng-by-name' |
+  'scoped-root' |
+  'no-state-write-in-update' |
+  'sync-lifecycle' |
+  'dom-free-assets',
   PluginRule
 >
 
 /** Shipped configs. `recommended` turns every rule on at its catalogue severity. */
-export declare const configs: { recommended: FlatConfig[] }
+type ConfigsType = { recommended: FlatConfig[] }
 
-declare const plugin: {
+export declare const configs: ConfigsType
+
+type PluginType = {
   meta:    { name: string, version: string }
   rules:   typeof rules
   configs: typeof configs
 }
+
+declare const plugin: PluginType
 
 export default plugin

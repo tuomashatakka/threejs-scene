@@ -2,6 +2,59 @@
 
 Newest first. One entry per release: the headline, then what it costs a consumer.
 
+## 0.7.0
+
+**Every module lifecycle now handles data in a deterministic, unidirectional, scoped way — and the package ships the instructions for using it.**
+
+The module contract gained the machinery that was previously left to each module's discipline. Nothing was removed: `AppModule` is a superset of what it was, `ModuleContext` is a superset of `SceneContext`, and existing modules keep working. What changed is that the guarantees are now the runtime's job rather than the author's.
+
+### Scoped
+
+- **Every module gets a `ctx.root`** — a `THREE.Group` attached to the scene at mount, and detached, emptied and disposed at teardown. Build into it; the objects under it need no teardown code at all.
+- **`ctx.own(resource)`** takes anything with a `dispose()`, any `Object3D`, or a plain teardown function, registers it, and returns it — so ownership costs one word inline. Owned resources release in the exact inverse of registration, after `dispose()` and after `ctx.onCleanup` callbacks.
+- **`ctx.rng` is forked by module id.** Adding a module no longer reshuffles the ones beside it.
+- **Objects added straight to `ctx.scene` are still adopted and torn down**, because ownership is not optional — but strict mode says so, with rule `SC004`.
+
+### Unidirectional
+
+- **`ctx.commit(patch)` replaces reaching for the app.** Commits are queued and drained *after every module has updated in that tick*, in module order then emission order, merged into one store write. No module ever observes a world another module half-changed, and the same tick sequence replays identically.
+- **Only a module that owns a state key may commit.** `defineScopedModule(at, initial, …)` gives it one key: it reads that key and its commits merge into that key, so two modules cannot collide. An unscoped commit is refused (`SC007`).
+- **`select` narrows what a module reads** to a projection of app state, and in strict mode the view is deep-frozen — writing through it throws where it happens rather than surfacing three ticks later.
+- **`setState` from inside a lifecycle hook is reported and dropped** (`SC006`) instead of landing mid-tick.
+
+### Deterministic
+
+- **Mount order is a pure function of the module list**: a stable topological sort over declared capabilities, tie-broken by the new `order` band and then insertion index. A list with no declarations runs exactly as written; a list with declarations runs in the only order that satisfies them, disturbing the rest as little as possible.
+- **Strict mode traps `Math.random`, `Date.now` and `performance.now`** during lifecycle calls, attributes the call site, and ignores three.js's own uuid generation. It also counts per-tick allocation, diffs the scene after build, and checks every declared capability was published.
+
+### Everything is a pluggable module
+
+- **Capability tokens.** `capability<Api>('name')`, `provides`/`requires`/`optional`, `ctx.provide`/`ctx.resolve`. Modules find each other through a declared contract rather than an import, so implementations are swappable — `orbitControls()` and `cameraRig()` both provide `camera-rig`.
+- **Six new modules** for things that were libraries beside the app: `camera` (iso/follow/perspective rigs), `input` (pointer sampled into the tick, with a raycast helper), `quality` (device ladder that measures, steps down, and remembers), `diagnostics` (shader-link audit and `renderer.info` sampling), `persistence` (a state key restored as a queued commit, written back on a timer), and `assets` (the procedural library given one owner and one forked rng).
+- **Plugins.** `definePlugin({ name, use })` bundles modules that only make sense together; `createApp({ plugins: [] })` flattens them ahead of `use`.
+- **A module registry.** Every built-in registers a descriptor — id, summary, import subpath, capabilities, options, cost — so the module set is enumerable instead of discoverable only by reading the source.
+- **`threejs-scene/testing`.** `auditModule()` runs a module through two full lifecycles and reports contract violations, undisposed GPU resources, objects stranded on the scene, and any difference between the two runs from the same seed. Plus `headlessApp`, `testModuleContext`, `snapshotObject`, `stubRenderer`, `stubCanvas`.
+
+### The package tells a model how to use all of it
+
+`llms.txt` listed the API. It could not say how to compose it, and nothing enforced the rules it described.
+
+- **`llm/AGENTS.md`** — the reference: the contract annotated, the three properties with their mechanisms, all 17 rules, six worked recipes that compile, composition and ordering, and a symptom-to-rule-code troubleshooting table.
+- **Six predefined agents** in `llm/agents/` — scene builder, module author, effect author, asset author, determinism auditor, performance auditor — each with the workflow it follows, the rules it owns, and the checklist it runs before claiming done. Plus the package as a skill.
+- **`threejs-scene/eslint`** — a flat-config plugin with seven AST rules carrying the same ids and codes as the runtime. Verified in both directions: it fires nine findings on a fixture of deliberate violations and none on this package's own source.
+- **`npx threejs-scene`** — `agents install`, `instructions`, `rules [SC004]`, `modules`, `skill`, `doctor`. Instructions nobody can find are instructions nobody reads.
+- **`threejs-scene/llm`** — the same content as data, for a host composing a prompt: `RULES`, `listModules()`, `describeRules()`, `instructions()`.
+- **The catalogues are generated** from the rule source and the module registry, with a `--check` mode the release workflow runs. A drifted rule list is worse than none, because an agent trusts it.
+
+### What a consumer has to change
+
+Nothing, to keep working. The behavioural differences worth knowing:
+
+- **`ctx.rng` inside a module is now forked by module id**, so a module drawing from it directly produces different numbers than before. Output changes; determinism improves. Fork by feature (`ctx.rng.fork('trees')`) and it is stable from here on.
+- **A module's `ctx` is its own scoped context**, not the app's object — a superset with the same `scene`, `camera` and `renderer`, so structural use is unaffected. Identity comparison against `app.ctx` is not.
+- **A module's `ctx.loop` refuses subscribers in strict mode** (`SC001`). Nothing in the package did this; `app.ctx.loop` is unchanged for app-level code.
+- **Strict mode is on by default outside `NODE_ENV=production`** and reports to the console. Pass `strict: false`, or `onViolation` to route it elsewhere.
+
 ## 0.6.2
 
 **Tighter, cheaper light-shaft defaults.**

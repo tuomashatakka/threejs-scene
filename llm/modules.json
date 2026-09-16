@@ -1,6 +1,6 @@
 {
   "generatedFrom": "the module registry, populated by importing every module subpath",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "modules": [
     {
       "id": "assets",

@@ -1,6 +1,6 @@
 {
   "generatedFrom": "lib/llm/rules.ts",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "rules": [
     {
       "code": "SC001",

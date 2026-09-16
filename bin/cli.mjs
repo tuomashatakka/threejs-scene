@@ -19,6 +19,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PKG  = resolve(HERE, '..')
 const CWD  = process.cwd()
@@ -145,7 +146,7 @@ function agentFiles () {
 /** The `name` and `description` from a markdown file's YAML frontmatter. */
 function frontmatter (file) {
   const text  = readFileSync(file, 'utf8')
-  const match = /^---\n([\s\S]*?)\n---/u.exec(text)
+  const match = (/^---\n([\s\S]*?)\n---/u).exec(text)
 
   if (!match)
     return { name: basename(file, '.md'), description: '' }

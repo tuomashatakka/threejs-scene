@@ -34,7 +34,7 @@ if (!existsSync(DIST)) {
 }
 
 // Imported from the build, not from source: the same objects a consumer gets.
-const { RULES } = await import(join(DIST, 'lib/llm/rules.js')) as typeof import('../lib/llm/rules.js')
+const { RULES }         = await import(join(DIST, 'lib/llm/rules.js')) as typeof import('../lib/llm/rules.js')
 const { moduleCatalog } = await import(join(DIST, 'lib/app/registry.js')) as typeof import('../lib/app/registry.js')
 
 // importing the barrel is what populates the registry — a descriptor registers
@@ -130,9 +130,11 @@ emit('modules.json', `${JSON.stringify({
 // ── llm/index.json ──────────────────────────────────────────────────────────
 
 /** The `name` and `description` from a markdown file's YAML frontmatter. */
-function frontmatter (file: string): { name: string, description: string } {
+type FrontmatterReturnType = { name: string, description: string }
+
+function frontmatter (file: string): FrontmatterReturnType {
   const text  = readFileSync(file, 'utf8')
-  const match = /^---\n([\s\S]*?)\n---/u.exec(text)
+  const match = (/^---\n([\s\S]*?)\n---/u).exec(text)
   const read  = (key: string): string => {
     const found = new RegExp(`^${key}:\\s*(.+)$`, 'mu').exec(match?.[1] ?? '')
     return found?.[1]?.trim().replace(/^["']|["']$/gu, '') ?? ''
@@ -145,7 +147,8 @@ const { readdirSync } = await import('node:fs')
 
 const agentDir = join(LLM, 'agents')
 const agents   = existsSync(agentDir)
-  ? readdirSync(agentDir).filter(name => name.endsWith('.md')).sort()
+  ? readdirSync(agentDir).filter(name => name.endsWith('.md'))
+    .sort()
   : []
 
 const manifest = {

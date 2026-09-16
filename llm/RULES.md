@@ -9,7 +9,7 @@ Three things enforce them. **Strict mode** reports them at runtime (on by defaul
 before the code runs, under the same ids. **`auditModule()`** from `threejs-scene/testing` proves
 the rest by running a module through two full lifecycles.
 
-Generated from `lib/llm/rules.ts` at version 0.6.2.
+Generated from `lib/llm/rules.ts` at version 0.7.0.
 
 | code | id | rule | severity | enforced by |
 | --- | --- | --- | --- | --- |

@@ -36,7 +36,7 @@ function url (code) {
  */
 function authorsModule (context) {
   const text = context.sourceCode.getText()
-  return /\bdefineModule\b|\bdefineScopedModule\b|\bAppModule\b|\bModuleContext\b/u.test(text)
+  return (/\bdefineModule\b|\bdefineScopedModule\b|\bAppModule\b|\bModuleContext\b/u).test(text)
 }
 
 /** The nearest enclosing object-literal method name, or null. */
@@ -86,7 +86,7 @@ function memberPath (node) {
  */
 function callsModuleContext (node, root, tail) {
   const path = node.callee.type === 'MemberExpression' ? memberPath(node.callee) : null
-  return path !== null && /(?:^|\.)ctx\./u.test(path) && path.endsWith(`${root}.${tail}`)
+  return path !== null && (/(?:^|\.)ctx\./u).test(path) && path.endsWith(`${root}.${tail}`)
 }
 
 const singleFrameLoop = {
@@ -271,7 +271,8 @@ const noStateWriteInUpdate = {
         if (!path)
           return
 
-        const bare = path.split('.').slice(-2).join('.')
+        const bare = path.split('.').slice(-2)
+          .join('.')
 
         if (path === 'setState' || bare.endsWith('.setState') || bare === 'store.set' || bare.endsWith('.dispatch') && !bare.startsWith('ctx.'))
           context.report({ node, messageId: 'write', data: { api: path, phase }})
@@ -316,7 +317,7 @@ const domFreeAssets = {
     },
   },
   create (context) {
-    if (!/[\\/]modules[\\/]assets[\\/]/u.test(context.filename))
+    if (!(/[\\/]modules[\\/]assets[\\/]/u).test(context.filename))
       return {}
 
     return {
@@ -336,13 +337,13 @@ const domFreeAssets = {
 }
 
 const rules = {
-  'single-frame-loop':       singleFrameLoop,
-  'no-nondeterminism':       noNondeterminism,
-  'fork-rng-by-name':        forkRngByName,
-  'scoped-root':             scopedRoot,
+  'single-frame-loop':        singleFrameLoop,
+  'no-nondeterminism':        noNondeterminism,
+  'fork-rng-by-name':         forkRngByName,
+  'scoped-root':              scopedRoot,
   'no-state-write-in-update': noStateWriteInUpdate,
-  'sync-lifecycle':          syncLifecycle,
-  'dom-free-assets':         domFreeAssets,
+  'sync-lifecycle':           syncLifecycle,
+  'dom-free-assets':          domFreeAssets,
 }
 
 const plugin = {
